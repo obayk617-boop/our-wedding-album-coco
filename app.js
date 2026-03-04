@@ -108,3 +108,27 @@ async function loadImages() {
 /* ---------- 自動更新 ---------- */
 setInterval(loadImages, 5000);
 loadImages();
+
+// ==========================
+// 🔴 Realtime 更新
+// ==========================
+
+supabaseClient
+  .channel("photos-realtime")
+  .on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "storage",
+      table: "objects"
+    },
+    (payload) => {
+      console.log("新しい写真追加!", payload);
+
+      // photos バケットだけ反応
+      if (payload.new.bucket_id === "photos") {
+        loadImages();
+      }
+    }
+  )
+  .subscribe();
