@@ -132,3 +132,75 @@ supabaseClient
     }
   )
   .subscribe();
+
+  const fab = document.getElementById("fab");
+const menu = document.getElementById("menu");
+
+const cameraBtn = document.getElementById("cameraBtn");
+const fileBtn = document.getElementById("fileBtn");
+
+const cameraInput = document.getElementById("cameraInput");
+const fileSelectInput = document.getElementById("fileSelectInput");
+
+const previewModal = document.getElementById("previewModal");
+const previewImage = document.getElementById("previewImage");
+
+const confirmUpload = document.getElementById("confirmUpload");
+const cancelUpload = document.getElementById("cancelUpload");
+
+let selectedFile = null;
+
+/* ＋ボタン */
+fab.onclick = () => {
+  menu.classList.toggle("hidden");
+};
+
+/* カメラ */
+cameraBtn.onclick = () => {
+  cameraInput.click();
+};
+
+/* アルバム */
+fileBtn.onclick = () => {
+  fileSelectInput.click();
+};
+
+/* ファイル選択 */
+cameraInput.onchange = handleFile;
+fileSelectInput.onchange = handleFile;
+
+function handleFile(e){
+  selectedFile = e.target.files[0];
+  if(!selectedFile) return;
+
+  previewImage.src = URL.createObjectURL(selectedFile);
+  previewModal.classList.remove("hidden");
+  menu.classList.add("hidden");
+}
+
+/* キャンセル */
+cancelUpload.onclick = ()=>{
+  previewModal.classList.add("hidden");
+};
+
+/* アップロード */
+confirmUpload.onclick = async ()=>{
+  previewModal.classList.add("hidden");
+
+  const compressedBlob = await compressImage(selectedFile);
+  const fileName = Date.now()+".jpg";
+
+  const {error} = await supabaseClient.storage
+    .from("photos")
+    .upload(fileName, compressedBlob, {
+      contentType:"image/jpeg"
+    });
+
+  if(error){
+    alert("アップロード失敗");
+    return;
+  }
+
+  alert("アップロード成功！");
+  loadImages();
+};

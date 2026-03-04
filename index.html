@@ -26,5 +26,26 @@
   </div>
 
   <script type="module" src="app.js"></script>
+  <!-- ＋ボタン -->
+  <div id="fab">＋</div>
+
+  <!-- メニュー -->
+  <div id="menu" class="hidden">
+    <button id="cameraBtn">📷 カメラ</button>
+    <button id="fileBtn">🖼 アルバム</button>
+  </div>
+
+  <!-- 確認モーダル -->
+  <div id="previewModal" class="hidden">
+    <div class="modalContent">
+      <img id="previewImage">
+      <br>
+      <button id="confirmUpload">アップロード</button>
+      <button id="cancelUpload">キャンセル</button>
+    </div>
+  </div>
+
+  <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+  <input type="file" id="fileSelectInput" accept="image/*" hidden>
 </body>
 </html>
