@@ -204,3 +204,7 @@ confirmUpload.onclick = async ()=>{
   alert("アップロード成功！");
   loadImages();
 };
+
+menu.classList.add("hidden");
+previewModal.classList.add("hidden");
+viewer.classList.add("hidden");

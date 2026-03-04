@@ -103,3 +103,7 @@ button {
   max-width:80vw;
   max-height:60vh;
 }
+
+.hidden{
+  display:none !important;
+}
