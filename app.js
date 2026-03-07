@@ -35,9 +35,10 @@ const confirmUpload = document.getElementById("confirmUpload");
 const cancelUpload = document.getElementById("cancelUpload");
 
 let selectedFile = null;
+let currentImageUrl = null;
 
 /* ==========================
-Viewer - 改善版
+Viewer - モバイル対応版
 ========================== */
 
 // 背景クリックで閉じる
@@ -57,9 +58,50 @@ viewerImg.onclick = (e) => {
   e.stopPropagation();
 };
 
-// ダウンロードボタンクリック
-downloadBtn.onclick = (e) => {
+// ダウンロードボタン - スマホアルバムに保存
+downloadBtn.onclick = async (e) => {
+  e.preventDefault();
   e.stopPropagation();
+  
+  if (!currentImageUrl) return;
+  
+  try {
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = "保存中…";
+    
+    const response = await fetch(currentImageUrl);
+    const blob = await response.blob();
+    
+    // モバイル環境での処理
+    if (navigator.share) {
+      // Share APIが利用可能な場合
+      const file = new File([blob], "wedding-photo.jpg", { type: "image/jpeg" });
+      await navigator.share({
+        files: [file],
+        title: "Wedding Photo",
+        text: "Wedding Album Photo"
+      });
+    } else {
+      // フォールバック: Blob URLをダウンロード
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "wedding-photo.jpg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    }
+    
+    downloadBtn.textContent = "⬇ ダウンロード";
+    downloadBtn.disabled = false;
+    
+  } catch (error) {
+    console.error("ダウンロード失敗:", error);
+    alert("保存に失敗しました");
+    downloadBtn.textContent = "⬇ ダウンロード";
+    downloadBtn.disabled = false;
+  }
 };
 
 /* ==========================
@@ -126,10 +168,7 @@ async function loadImages() {
     img.onclick = () => {
 
       viewerImg.src = img.src;
-      
-      // ダウンロードボタンの属性を設定
-      downloadBtn.href = img.src;
-      downloadBtn.download = file.name;
+      currentImageUrl = img.src;
       
       // モーダルを表示
       viewer.classList.remove("hidden");
