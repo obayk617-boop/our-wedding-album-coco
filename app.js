@@ -36,7 +36,23 @@ const cancelUpload = document.getElementById("cancelUpload");
 
 let selectedFile = null;
 let currentImageUrl = null;
+let currentImageFileName = null;
 let menuOpen = false;
+
+/* ==========================
+ユーザーID管理
+========================== */
+
+function getOrCreateUserId() {
+  let userId = localStorage.getItem("wedding_album_user_id");
+  if (!userId) {
+    userId = "user_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("wedding_album_user_id", userId);
+  }
+  return userId;
+}
+
+const currentUserId = getOrCreateUserId();
 
 /* ==========================
 無限スクロール用の変数
@@ -44,8 +60,10 @@ let menuOpen = false;
 
 let allFiles = [];
 let displayedCount = 0;
-const itemsPerPage = 12; // 1回に読み込む枚数
+const itemsPerPage = 12;
 let isLoading = false;
+let likesCache = {}; // ファイル名: いいね数のキャッシュ
+let userLikes = {}; // ファイル名: ユーザーがいいねしたかどうか
 
 /* ==========================
 トースト通知
@@ -100,8 +118,92 @@ style.textContent = `
       transform: translateX(-50%) translateY(20px);
     }
   }
+
+  @keyframes heartPulse {
+    0% {
+      transform: scale(1);
+    }
+    25% {
+      transform: scale(1.3);
+    }
+    50% {
+      transform: scale(1);
+    }
+  }
 `;
 document.head.appendChild(style);
+
+/* ==========================
+いいね機能
+========================== */
+
+async function getLikesForImage(fileName) {
+  const { count } = await supabaseClient
+    .from("likes")
+    .select("*", { count: "exact", head: true })
+    .eq("file_name", fileName);
+  
+  return count || 0;
+}
+
+async function checkUserLike(fileName) {
+  const { data } = await supabaseClient
+    .from("likes")
+    .select("id")
+    .eq("file_name", fileName)
+    .eq("user_id", currentUserId);
+  
+  return data && data.length > 0;
+}
+
+async function toggleLike(fileName) {
+  try {
+    const hasLiked = await checkUserLike(fileName);
+    
+    if (hasLiked) {
+      // いいねを削除
+      await supabaseClient
+        .from("likes")
+        .delete()
+        .eq("file_name", fileName)
+        .eq("user_id", currentUserId);
+      
+      userLikes[fileName] = false;
+    } else {
+      // いいねを追加
+      await supabaseClient
+        .from("likes")
+        .insert([
+          {
+            file_name: fileName,
+            user_id: currentUserId
+          }
+        ]);
+      
+      userLikes[fileName] = true;
+    }
+    
+    // いいね数を更新
+    const newCount = await getLikesForImage(fileName);
+    likesCache[fileName] = newCount;
+    updateLikeButtons(fileName);
+    
+  } catch (error) {
+    console.error("いいね操作エラー:", error);
+  }
+}
+
+function updateLikeButtons(fileName) {
+  // ギャラリー内のボタン
+  const likeBtn = document.querySelector(`[data-like-btn="${fileName}"]`);
+  if (likeBtn) {
+    const count = likesCache[fileName] || 0;
+    const isLiked = userLikes[fileName] || false;
+    
+    likeBtn.textContent = isLiked ? `❤️ ${count}` : `🤍 ${count}`;
+    likeBtn.style.color = isLiked ? "#ff4081" : "#999";
+  }
+}
 
 /* ==========================
 Viewer
@@ -214,7 +316,7 @@ async function compressImage(file, maxWidth = 1280, quality = 0.7) {
 }
 
 /* ==========================
-Gallery - 無限スクロール対応版
+Gallery - いいね機能付き
 ========================== */
 
 async function loadAllImages() {
@@ -223,7 +325,7 @@ async function loadAllImages() {
     .from("photos")
     .list("", {
       sortBy: { column: "created_at", order: "desc" },
-      limit: 1000 // 最大1000件まで取得
+      limit: 1000
     });
 
   if (error) {
@@ -235,7 +337,12 @@ async function loadAllImages() {
   displayedCount = 0;
   gallery.innerHTML = "";
   
-  // 最初の画像を読み込む
+  // 全画像のいいね数を取得
+  for (const file of allFiles) {
+    likesCache[file.name] = await getLikesForImage(file.name);
+    userLikes[file.name] = await checkUserLike(file.name);
+  }
+  
   displayMoreImages();
 }
 
@@ -255,26 +362,75 @@ function displayMoreImages() {
       .from("photos")
       .getPublicUrl(file.name);
 
+    // コンテナ
+    const container = document.createElement("div");
+    container.style.cssText = `
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+    `;
+
     const img = document.createElement("img");
     img.src = urlData.publicUrl;
-    img.loading = "lazy"; // ネイティブ遅延読み込み
+    img.loading = "lazy";
+    img.style.cssText = `
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 12px;
+      cursor: pointer;
+    `;
 
     img.onclick = () => {
       viewerImg.src = img.src;
       currentImageUrl = img.src;
+      currentImageFileName = file.name;
       
       viewer.classList.remove("hidden");
       closeMenu();
     };
 
-    gallery.appendChild(img);
+    // いいねボタン
+    const likeBtn = document.createElement("button");
+    likeBtn.setAttribute("data-like-btn", file.name);
+    likeBtn.style.cssText = `
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 10;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    `;
+
+    const count = likesCache[file.name] || 0;
+    const isLiked = userLikes[file.name] || false;
+    likeBtn.textContent = isLiked ? `❤️ ${count}` : `🤍 ${count}`;
+    likeBtn.style.color = isLiked ? "#ff4081" : "#999";
+
+    likeBtn.onclick = async (e) => {
+      e.stopPropagation();
+      likeBtn.style.animation = "heartPulse 0.4s ease";
+      await toggleLike(file.name);
+      setTimeout(() => {
+        likeBtn.style.animation = "";
+      }, 400);
+    };
+
+    container.appendChild(img);
+    container.appendChild(likeBtn);
+    gallery.appendChild(container);
   }
   
   displayedCount = endIndex;
   isLoading = false;
 }
 
-// 初期読み込み
 loadAllImages();
 
 /* ==========================
@@ -283,7 +439,7 @@ loadAllImages();
 
 const observerOptions = {
   root: null,
-  rootMargin: '200px', // 画面の下から200px手前で読み込み開始
+  rootMargin: '200px',
   threshold: 0
 };
 
@@ -295,16 +451,14 @@ const observer = new IntersectionObserver((entries) => {
   });
 }, observerOptions);
 
-// ギャラリーの最後の画像を監視
 function updateObserver() {
-  const images = gallery.querySelectorAll('img');
-  if (images.length > 0) {
-    const lastImage = images[images.length - 1];
-    observer.observe(lastImage);
+  const containers = gallery.querySelectorAll('div');
+  if (containers.length > 0) {
+    const lastContainer = containers[containers.length - 1];
+    observer.observe(lastContainer);
   }
 }
 
-// displayMoreImages後に監視を更新
 const originalDisplayMoreImages = displayMoreImages;
 displayMoreImages = function() {
   originalDisplayMoreImages();
@@ -329,9 +483,29 @@ supabaseClient
     (payload) => {
 
       if (payload.new.bucket_id === "photos") {
-        loadAllImages(); // 新しい写真が追加されたら再読み込み
+        loadAllImages();
       }
 
+    }
+  )
+  .subscribe();
+
+// いいね更新のリアルタイム監視
+supabaseClient
+  .channel("likes-realtime")
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "likes"
+    },
+    async (payload) => {
+      const fileName = payload.new?.file_name || payload.old?.file_name;
+      if (fileName) {
+        likesCache[fileName] = await getLikesForImage(fileName);
+        updateLikeButtons(fileName);
+      }
     }
   )
   .subscribe();
@@ -360,13 +534,11 @@ function toggleMenu() {
   }
 }
 
-// ＋ボタン
 fab.onclick = (e) => {
   e.stopPropagation();
   toggleMenu();
 };
 
-// メニューボタン
 cameraBtn.onclick = () => {
   cameraInput.click();
   closeMenu();
@@ -377,7 +549,6 @@ fileBtn.onclick = () => {
   closeMenu();
 };
 
-// ページ全体をクリックしてメニュー閉じる
 document.addEventListener("click", (e) => {
   if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) {
     closeMenu();
@@ -467,7 +638,7 @@ confirmUpload.onclick = async () => {
 
   }, 800);
 
-  loadAllImages(); // 無限スクロール用に再読み込み
+  loadAllImages();
 
 };
 
