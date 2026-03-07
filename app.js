@@ -9,6 +9,7 @@ const gallery = document.getElementById("gallery");
 const viewer = document.getElementById("viewer");
 const viewerImg = document.getElementById("viewerImg");
 const uploadStatus = document.getElementById("uploadStatus");
+const spinner = document.getElementById("spinner");
 
 viewer.onclick = () => viewer.style.display = "none";
 
@@ -149,7 +150,7 @@ let selectedFile = null;
 
 /* ＋ボタン */
 fab.onclick = () => {
-  menu.classList.toggle("hidden");
+  menu.classList.toggle("show");
 };
 
 /* カメラ */
@@ -189,6 +190,7 @@ confirmUpload.onclick = async () => {
   cancelUpload.disabled = true;
 
   uploadStatus.textContent = "圧縮中…";
+  spinner.classList.remove("hidden");
 
   const compressedBlob = await compressImage(selectedFile);
 
@@ -211,6 +213,7 @@ confirmUpload.onclick = async () => {
   }
 
   uploadStatus.textContent = "アップロード完了！";
+  spinner.classList.add("hidden");
 
   setTimeout(()=>{
     previewModal.classList.add("hidden");
