@@ -108,9 +108,7 @@ button {
   display:none !important;
 }
 
-/* ======================
-メニュー
-====================== */
+/* メニュー初期状態 */
 
 #menu{
   position:fixed;
@@ -121,8 +119,10 @@ button {
   flex-direction:column;
   gap:10px;
 
-  transform:translateY(20px);
+  transform:translateY(30px);
   opacity:0;
+
+  pointer-events:none;
 
   transition:all .25s ease;
 }
@@ -132,6 +132,8 @@ button {
 #menu.show{
   transform:translateY(0);
   opacity:1;
+
+  pointer-events:auto;
 }
 
 /* ボタン */
@@ -140,7 +142,8 @@ button {
   padding:10px 14px;
   border:none;
   border-radius:20px;
-  background:#fff;
+
+  background:white;
   box-shadow:0 4px 10px rgba(0,0,0,.2);
 }
 
