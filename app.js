@@ -151,6 +151,7 @@ let selectedFile = null;
 /* ＋ボタン */
 fab.onclick = () => {
   menu.classList.toggle("show");
+  menu.classList.remove("hidden");
 };
 
 /* カメラ */
