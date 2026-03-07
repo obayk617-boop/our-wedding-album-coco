@@ -178,16 +178,21 @@ async function toggleLike(fileName) {
     const hasLiked = await checkUserLike(fileName);
     
     if (hasLiked) {
-      await supabaseClient
+      const { error } = await supabaseClient
         .from("likes")
         .delete()
         .eq("file_name", fileName)
         .eq("user_id", currentUserId);
       
+      if (error?.status === 429) {
+        showToast("⚠️ 一時的に混雑しています。少し待ってから再度お試しください");
+        return;
+      }
+      
       userLikes[fileName] = false;
       likesCache[fileName] = Math.max(0, (likesCache[fileName] || 0) - 1);
     } else {
-      await supabaseClient
+      const { error } = await supabaseClient
         .from("likes")
         .insert([
           {
@@ -195,6 +200,11 @@ async function toggleLike(fileName) {
             user_id: currentUserId
           }
         ]);
+      
+      if (error?.status === 429) {
+        showToast("⚠️ 一時的に混雑しています。少し待ってから再度お試しください");
+        return;
+      }
       
       userLikes[fileName] = true;
       likesCache[fileName] = (likesCache[fileName] || 0) + 1;
@@ -204,6 +214,7 @@ async function toggleLike(fileName) {
     
   } catch (error) {
     console.error("いいね操作エラー:", error);
+    showToast("❌ エラーが発生しました");
   }
 }
 
@@ -369,8 +380,8 @@ async function loadAllImages() {
     isInitialLoadDone = true;
     loadLikesData();
   } else if (photosAdded > 0) {
-    // 新しい画像のみいいね数を読み込む
-    const newPhotos = allFiles.slice(0, photosAdded);
+    // 新しく追加された画像のみいいね数を取得（最初の5枚のみ）
+    const newPhotos = allFiles.slice(0, Math.min(photosAdded, 5));
     for (const file of newPhotos) {
       try {
         const count = await getLikesForImage(file.name);
@@ -387,9 +398,11 @@ async function loadAllImages() {
   }
 }
 
-// いいねデータを非同期で読み込む
+// いいねデータを非同期で読み込む（最初の30枚のみ）
 async function loadLikesData() {
-  for (const file of allFiles) {
+  const filesToLoad = allFiles.slice(0, 30);
+  
+  for (const file of filesToLoad) {
     try {
       const count = await getLikesForImage(file.name);
       likesCache[file.name] = count;
@@ -399,6 +412,10 @@ async function loadLikesData() {
       
       updateLikeButtons(file.name);
     } catch (error) {
+      if (error?.message?.includes('429')) {
+        console.warn('レート制限に達しました');
+        break;
+      }
       console.error(`Error loading likes for ${file.name}:`, error);
     }
   }
@@ -466,10 +483,25 @@ function displayMoreImages() {
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     `;
 
-    const count = likesCache[file.name] || 0;
+    const count = likesCache[file.name];
     const isLiked = userLikes[file.name] || false;
-    likeBtn.textContent = isLiked ? `❤️ ${count}` : `🤍 ${count}`;
-    likeBtn.style.color = isLiked ? "#ff4081" : "#999";
+    
+    // いいね数が未取得の場合は "？"を表示
+    if (count === undefined) {
+      likeBtn.textContent = `❓ ?`;
+      likeBtn.style.color = "#999";
+      
+      // 非同期でいいね数を取得
+      getLikesForImage(file.name)
+        .then(cnt => {
+          likesCache[file.name] = cnt;
+          updateLikeButtons(file.name);
+        })
+        .catch(err => console.error(`Error loading likes for ${file.name}:`, err));
+    } else {
+      likeBtn.textContent = isLiked ? `❤️ ${count}` : `🤍 ${count}`;
+      likeBtn.style.color = isLiked ? "#ff4081" : "#999";
+    }
 
     likeBtn.onclick = async (e) => {
       e.stopPropagation();
@@ -526,17 +558,17 @@ displayMoreImages = function() {
 updateObserver();
 
 /* ==========================
-Realtime - 最適化ポーリング + WebSocket
+Realtime - WebSocket最適化版（ポーリングなし）
 ========================== */
 
 let photosChannel = null;
 let likesChannel = null;
-let pollInterval = null;
+let isLikesChannelConnected = false;
 
 function setupRealtimeListeners() {
   console.log('Setting up realtime listeners...');
   
-  // ★ WebSocket: いいね変更を受信（リクエストカウント対象外）
+  // ★ いいね更新のWebSocket監視（リクエストカウント対象外）
   likesChannel = supabaseClient.channel('public:likes');
 
   likesChannel
@@ -552,13 +584,14 @@ function setupRealtimeListeners() {
         const fileName = payload.new?.file_name || payload.old?.file_name;
         
         if (fileName) {
-          // WebSocketから受け取った更新をローカルキャッシュに反映
           const event = payload.eventType;
           
           if (event === 'INSERT') {
             likesCache[fileName] = (likesCache[fileName] || 0) + 1;
+            console.log(`いいねが追加: ${fileName} (${likesCache[fileName]})`);
           } else if (event === 'DELETE') {
             likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
+            console.log(`いいねが削除: ${fileName} (${likesCache[fileName]})`);
           }
           
           updateLikeButtons(fileName);
@@ -567,49 +600,19 @@ function setupRealtimeListeners() {
     )
     .subscribe((status) => {
       console.log('Likes channel status:', status);
-    });
-
-  // ★ ポーリング: 1分ごとに全いいね数を同期（確実性のため）
-  // これにより、WebSocket接続が一時的に失われた場合でも復帰可能
-  pollInterval = setInterval(async () => {
-    console.log('Polling likes...');
-    
-    // 画面に表示されている画像のいいね数のみ取得
-    const visibleImages = document.querySelectorAll('[data-like-btn]');
-    const fileNamesToCheck = Array.from(visibleImages)
-      .map(btn => btn.getAttribute('data-like-btn'))
-      .filter(name => name); // nullフィルタ
-    
-    if (fileNamesToCheck.length === 0) return;
-    
-    // 5個ずつバッチで取得（リクエスト数削減）
-    const MAX_BATCH = 5;
-    for (let i = 0; i < fileNamesToCheck.length; i += MAX_BATCH) {
-      const batch = fileNamesToCheck.slice(i, i + MAX_BATCH);
-      
-      await Promise.all(
-        batch.map(async (fileName) => {
-          try {
-            const count = await getLikesForImage(fileName);
-            
-            // ズレが生じた場合のみ更新
-            if (count !== likesCache[fileName]) {
-              console.log(`Sync: ${fileName}: ${likesCache[fileName]} → ${count}`);
-              likesCache[fileName] = count;
-              updateLikeButtons(fileName);
-            }
-          } catch (error) {
-            console.error(`Error polling ${fileName}:`, error);
-          }
-        })
-      );
-      
-      // バッチ間に待機
-      if (i + MAX_BATCH < fileNamesToCheck.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (status === 'SUBSCRIBED') {
+        isLikesChannelConnected = true;
+        showToast('✅ リアルタイム接続成功');
+      } else if (status === 'CLOSED') {
+        isLikesChannelConnected = false;
+        showToast('⚠️ リアルタイム接続切断（自動再接続中）');
+        
+        // 自動再接続
+        setTimeout(() => {
+          setupRealtimeListeners();
+        }, 3000);
       }
-    }
-  }, 60000); // ★ 60秒ごと（1分）← 大幅削減
+    });
 
   // 新しい写真追加の監視
   photosChannel = supabaseClient.channel('public:objects');
@@ -637,12 +640,16 @@ function setupRealtimeListeners() {
 // リアルタイムリスナー開始
 setupRealtimeListeners();
 
+// 定期的に接続確認（30秒ごと）
+setInterval(() => {
+  if (!isLikesChannelConnected) {
+    console.warn('WebSocket接続が失われています。再接続します...');
+    setupRealtimeListeners();
+  }
+}, 30000);
+
 // ページを離れる時にクリーンアップ
 window.addEventListener('beforeunload', () => {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    console.log('Poll interval cleared');
-  }
   if (likesChannel) {
     likesChannel.unsubscribe();
     console.log('Likes channel unsubscribed');
@@ -653,15 +660,15 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-// ページを非表示になった時は一時停止
+// ページを非表示になった時はチャンネル削除、復帰時に再接続
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    if (pollInterval) clearInterval(pollInterval);
-    console.log('Page hidden - polling paused');
+    if (likesChannel) likesChannel.unsubscribe();
+    if (photosChannel) photosChannel.unsubscribe();
+    console.log('Page hidden - channels paused');
   } else {
-    // ページが見える状態に戻ったら再開
     setupRealtimeListeners();
-    console.log('Page visible - polling resumed');
+    console.log('Page visible - channels reconnected');
   }
 });
 
