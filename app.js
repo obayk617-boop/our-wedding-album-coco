@@ -39,6 +39,15 @@ let currentImageUrl = null;
 let menuOpen = false;
 
 /* ==========================
+無限スクロール用の変数
+========================== */
+
+let allFiles = [];
+let displayedCount = 0;
+const itemsPerPage = 12; // 1回に読み込む枚数
+let isLoading = false;
+
+/* ==========================
 トースト通知
 ========================== */
 
@@ -205,50 +214,104 @@ async function compressImage(file, maxWidth = 1280, quality = 0.7) {
 }
 
 /* ==========================
-Gallery
+Gallery - 無限スクロール対応版
 ========================== */
 
-async function loadImages() {
+async function loadAllImages() {
 
   const { data, error } = await supabaseClient.storage
     .from("photos")
     .list("", {
-      sortBy: { column: "created_at", order: "desc" }
+      sortBy: { column: "created_at", order: "desc" },
+      limit: 1000 // 最大1000件まで取得
     });
 
-  if (error) return;
+  if (error) {
+    console.error("画像読み込みエラー:", error);
+    return;
+  }
 
+  allFiles = data || [];
+  displayedCount = 0;
   gallery.innerHTML = "";
+  
+  // 最初の画像を読み込む
+  displayMoreImages();
+}
 
-  data.forEach(file => {
-
+function displayMoreImages() {
+  
+  if (isLoading) return;
+  if (displayedCount >= allFiles.length) return;
+  
+  isLoading = true;
+  
+  const endIndex = Math.min(displayedCount + itemsPerPage, allFiles.length);
+  
+  for (let i = displayedCount; i < endIndex; i++) {
+    const file = allFiles[i];
+    
     const { data: urlData } = supabaseClient.storage
       .from("photos")
       .getPublicUrl(file.name);
 
     const img = document.createElement("img");
-
     img.src = urlData.publicUrl;
+    img.loading = "lazy"; // ネイティブ遅延読み込み
 
     img.onclick = () => {
-
       viewerImg.src = img.src;
       currentImageUrl = img.src;
       
       viewer.classList.remove("hidden");
-      
-      // メニュー閉じる
       closeMenu();
-
     };
 
     gallery.appendChild(img);
-
-  });
-
+  }
+  
+  displayedCount = endIndex;
+  isLoading = false;
 }
 
-loadImages();
+// 初期読み込み
+loadAllImages();
+
+/* ==========================
+無限スクロール検出
+========================== */
+
+const observerOptions = {
+  root: null,
+  rootMargin: '200px', // 画面の下から200px手前で読み込み開始
+  threshold: 0
+};
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && displayedCount < allFiles.length) {
+      displayMoreImages();
+    }
+  });
+}, observerOptions);
+
+// ギャラリーの最後の画像を監視
+function updateObserver() {
+  const images = gallery.querySelectorAll('img');
+  if (images.length > 0) {
+    const lastImage = images[images.length - 1];
+    observer.observe(lastImage);
+  }
+}
+
+// displayMoreImages後に監視を更新
+const originalDisplayMoreImages = displayMoreImages;
+displayMoreImages = function() {
+  originalDisplayMoreImages();
+  setTimeout(updateObserver, 100);
+};
+
+updateObserver();
 
 /* ==========================
 Realtime
@@ -266,7 +329,7 @@ supabaseClient
     (payload) => {
 
       if (payload.new.bucket_id === "photos") {
-        loadImages();
+        loadAllImages(); // 新しい写真が追加されたら再読み込み
       }
 
     }
@@ -404,7 +467,7 @@ confirmUpload.onclick = async () => {
 
   }, 800);
 
-  loadImages();
+  loadAllImages(); // 無限スクロール用に再読み込み
 
 };
 
