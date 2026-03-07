@@ -489,54 +489,43 @@ displayMoreImages = function() {
 updateObserver();
 
 /* ==========================
-Realtime - いいね更新（修正版）
+Realtime - ポーリング方式（最適化版）
 ========================== */
 
-// リアルタイムチャンネル設定
 let photosChannel = null;
-let likesChannel = null;
+let pollInterval = null;
+let lastPollTime = 0;
 
 function setupRealtimeListeners() {
-  // いいね更新のリアルタイム監視
-  likesChannel = supabaseClient.channel('public:likes', {
-    config: {
-      broadcast: { self: true },
-      presence: { key: currentUserId }
-    }
-  });
-
-  likesChannel
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'likes'
-      },
-      (payload) => {
-        console.log('いいね更新受信:', payload);
-        const fileName = payload.new?.file_name || payload.old?.file_name;
-        
-        if (fileName) {
-          // 全いいね数を即座に更新
-          getLikesForImage(fileName).then(count => {
+  console.log('Setting up realtime listeners...');
+  
+  // 定期的にいいね数を更新（1秒ごと、でも変更があった時だけUI更新）
+  pollInterval = setInterval(async () => {
+    const now = Date.now();
+    
+    // 現在表示されている画像のいいね数を更新
+    const fileNames = Object.keys(likesCache);
+    
+    if (fileNames.length > 0) {
+      for (const fileName of fileNames) {
+        try {
+          const count = await getLikesForImage(fileName);
+          
+          // いいね数が変わった場合のみ更新
+          if (count !== likesCache[fileName]) {
+            console.log(`${fileName}: ${likesCache[fileName]} → ${count}`);
             likesCache[fileName] = count;
             updateLikeButtons(fileName);
-          });
+          }
+        } catch (error) {
+          console.error(`Error polling likes for ${fileName}:`, error);
         }
       }
-    )
-    .subscribe((status) => {
-      console.log('Likes channel status:', status);
-    });
+    }
+  }, 1000); // 1秒ごと
 
   // 新しい写真追加の監視
-  photosChannel = supabaseClient.channel('public:objects', {
-    config: {
-      broadcast: { self: true },
-      presence: { key: currentUserId }
-    }
-  });
+  photosChannel = supabaseClient.channel('public:objects');
 
   photosChannel
     .on(
@@ -547,7 +536,7 @@ function setupRealtimeListeners() {
         table: 'objects'
       },
       (payload) => {
-        console.log('写真追加受信:', payload);
+        console.log('新しい写真が追加されました:', payload);
         if (payload.new.bucket_id === "photos") {
           loadAllImages();
         }
@@ -561,10 +550,28 @@ function setupRealtimeListeners() {
 // リアルタイムリスナー開始
 setupRealtimeListeners();
 
-// ページを離れる時にチャンネルをクリーンアップ
+// ページを離れる時にクリーンアップ
 window.addEventListener('beforeunload', () => {
-  if (likesChannel) likesChannel.unsubscribe();
-  if (photosChannel) photosChannel.unsubscribe();
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    console.log('Poll interval cleared');
+  }
+  if (photosChannel) {
+    photosChannel.unsubscribe();
+    console.log('Photos channel unsubscribed');
+  }
+});
+
+// ページを非表示になった時は一時停止
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (pollInterval) clearInterval(pollInterval);
+    console.log('Page hidden - polling paused');
+  } else {
+    // ページが見える状態に戻ったら再開
+    setupRealtimeListeners();
+    console.log('Page visible - polling resumed');
+  }
 });
 
 /* ==========================
