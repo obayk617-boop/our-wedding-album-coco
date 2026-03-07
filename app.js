@@ -5,13 +5,10 @@ const supabaseClient = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5c2RvaWN3eXJveWdha2Ryd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2NDExMzEsImV4cCI6MjA4NzIxNzEzMX0.uBpCtpMy8pIHTi0bU3GkwcquW-15QcQOr6Pw58TNlAw"
 );
 
-const fileInput = document.getElementById("fileInput");
-const uploadBtn = document.getElementById("uploadBtn");
 const gallery = document.getElementById("gallery");
 const viewer = document.getElementById("viewer");
 const viewerImg = document.getElementById("viewerImg");
-
-uploadBtn.addEventListener("click", upload);
+const uploadStatus = document.getElementById("uploadStatus");
 
 viewer.onclick = () => viewer.style.display = "none";
 
@@ -184,10 +181,19 @@ cancelUpload.onclick = ()=>{
 };
 
 /* アップロード */
-confirmUpload.onclick = async ()=>{
-  previewModal.classList.add("hidden");
+confirmUpload.onclick = async () => {
+
+  if(!selectedFile) return;
+
+  confirmUpload.disabled = true;
+  cancelUpload.disabled = true;
+
+  uploadStatus.textContent = "圧縮中…";
 
   const compressedBlob = await compressImage(selectedFile);
+
+  uploadStatus.textContent = "アップロード中…";
+
   const fileName = Date.now()+".jpg";
 
   const {error} = await supabaseClient.storage
@@ -197,11 +203,24 @@ confirmUpload.onclick = async ()=>{
     });
 
   if(error){
+    uploadStatus.textContent = "";
     alert("アップロード失敗");
+    confirmUpload.disabled = false;
+    cancelUpload.disabled = false;
     return;
   }
 
-  alert("アップロード成功！");
+  uploadStatus.textContent = "アップロード完了！";
+
+  setTimeout(()=>{
+    previewModal.classList.add("hidden");
+
+    confirmUpload.disabled = false;
+    cancelUpload.disabled = false;
+
+    uploadStatus.textContent = "";
+  },800);
+
   loadImages();
 };
 
