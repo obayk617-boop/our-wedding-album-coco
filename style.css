@@ -113,7 +113,7 @@ button {
 }
 
 /* =====================
-メニュー
+メニュー - 改善版
 ===================== */
 
 .menu {
@@ -124,6 +124,16 @@ button {
   flex-direction: column;
   gap: 8px;
   z-index: 40;
+  transform: scale(0.8) translateY(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.menu.show {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .menu.hidden {

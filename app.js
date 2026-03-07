@@ -283,12 +283,25 @@ supabaseClient
 ＋ボタン
 ========================== */
 
+let menuOpen = false;
+
 fab.onclick = () => {
-
-  menu.classList.toggle("show");
-  menu.classList.remove("hidden");
-
+  menuOpen = !menuOpen;
+  
+  if (menuOpen) {
+    menu.classList.remove("hidden");
+  } else {
+    menu.classList.add("hidden");
+  }
 };
+
+/* FAB外をクリックしてメニューを閉じる */
+document.addEventListener("click", (e) => {
+  if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) {
+    menu.classList.add("hidden");
+    menuOpen = false;
+  }
+});
 
 /* ==========================
 カメラ
