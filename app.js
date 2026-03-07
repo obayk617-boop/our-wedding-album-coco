@@ -14,6 +14,7 @@ const gallery = document.getElementById("gallery");
 const viewer = document.getElementById("viewer");
 const viewerImg = document.getElementById("viewerImg");
 const downloadBtn = document.getElementById("downloadBtn");
+const closeViewer = document.getElementById("closeViewer");
 
 const uploadStatus = document.getElementById("uploadStatus");
 const spinner = document.getElementById("spinner");
@@ -36,13 +37,29 @@ const cancelUpload = document.getElementById("cancelUpload");
 let selectedFile = null;
 
 /* ==========================
-viewer
+Viewer - 改善版
 ========================== */
 
+// 背景クリックで閉じる
 viewer.onclick = (e) => {
   if (e.target === viewer) {
     viewer.classList.add("hidden");
   }
+};
+
+// ×ボタンで閉じる
+closeViewer.onclick = () => {
+  viewer.classList.add("hidden");
+};
+
+// 画像クリックでは閉じない
+viewerImg.onclick = (e) => {
+  e.stopPropagation();
+};
+
+// ダウンロードボタンクリック
+downloadBtn.onclick = (e) => {
+  e.stopPropagation();
 };
 
 /* ==========================
@@ -109,8 +126,12 @@ async function loadImages() {
     img.onclick = () => {
 
       viewerImg.src = img.src;
+      
+      // ダウンロードボタンの属性を設定
       downloadBtn.href = img.src;
-
+      downloadBtn.download = file.name;
+      
+      // モーダルを表示
       viewer.classList.remove("hidden");
 
     };
