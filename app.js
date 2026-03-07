@@ -526,49 +526,90 @@ displayMoreImages = function() {
 updateObserver();
 
 /* ==========================
-Realtime - 新規画像は自動表示 + いいねはポーリング
+Realtime - 最適化ポーリング + WebSocket
 ========================== */
 
 let photosChannel = null;
+let likesChannel = null;
 let pollInterval = null;
 
 function setupRealtimeListeners() {
   console.log('Setting up realtime listeners...');
   
-  // 定期的にいいね数を更新（表示されている画像のみ）
+  // ★ WebSocket: いいね変更を受信（リクエストカウント対象外）
+  likesChannel = supabaseClient.channel('public:likes');
+
+  likesChannel
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'likes'
+      },
+      (payload) => {
+        console.log('いいね更新受信:', payload);
+        const fileName = payload.new?.file_name || payload.old?.file_name;
+        
+        if (fileName) {
+          // WebSocketから受け取った更新をローカルキャッシュに反映
+          const event = payload.eventType;
+          
+          if (event === 'INSERT') {
+            likesCache[fileName] = (likesCache[fileName] || 0) + 1;
+          } else if (event === 'DELETE') {
+            likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
+          }
+          
+          updateLikeButtons(fileName);
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Likes channel status:', status);
+    });
+
+  // ★ ポーリング: 1分ごとに全いいね数を同期（確実性のため）
+  // これにより、WebSocket接続が一時的に失われた場合でも復帰可能
   pollInterval = setInterval(async () => {
-    // 現在画面に表示されている画像のいいね数のみ更新
+    console.log('Polling likes...');
+    
+    // 画面に表示されている画像のいいね数のみ取得
     const visibleImages = document.querySelectorAll('[data-like-btn]');
-    const fileNamesToCheck = Array.from(visibleImages).map(btn => btn.getAttribute('data-like-btn'));
+    const fileNamesToCheck = Array.from(visibleImages)
+      .map(btn => btn.getAttribute('data-like-btn'))
+      .filter(name => name); // nullフィルタ
     
     if (fileNamesToCheck.length === 0) return;
     
-    // 同時リクエスト数を制限
-    const MAX_CONCURRENT = 5;
-    for (let i = 0; i < fileNamesToCheck.length; i += MAX_CONCURRENT) {
-      const batch = fileNamesToCheck.slice(i, i + MAX_CONCURRENT);
+    // 5個ずつバッチで取得（リクエスト数削減）
+    const MAX_BATCH = 5;
+    for (let i = 0; i < fileNamesToCheck.length; i += MAX_BATCH) {
+      const batch = fileNamesToCheck.slice(i, i + MAX_BATCH);
       
       await Promise.all(
         batch.map(async (fileName) => {
           try {
             const count = await getLikesForImage(fileName);
             
+            // ズレが生じた場合のみ更新
             if (count !== likesCache[fileName]) {
-              console.log(`${fileName}: ${likesCache[fileName]} → ${count}`);
+              console.log(`Sync: ${fileName}: ${likesCache[fileName]} → ${count}`);
               likesCache[fileName] = count;
               updateLikeButtons(fileName);
             }
           } catch (error) {
-            console.error(`Error polling likes for ${fileName}:`, error);
+            console.error(`Error polling ${fileName}:`, error);
           }
         })
       );
       
-      if (i + MAX_CONCURRENT < fileNamesToCheck.length) {
+      // バッチ間に待機
+      if (i + MAX_BATCH < fileNamesToCheck.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-  }, 3000); // 3秒ごと
+  }, 60000); // ★ 60秒ごと（1分）← 大幅削減
 
   // 新しい写真追加の監視
   photosChannel = supabaseClient.channel('public:objects');
@@ -584,7 +625,6 @@ function setupRealtimeListeners() {
       (payload) => {
         console.log('新しい写真が追加されました:', payload);
         if (payload.new.bucket_id === "photos") {
-          // 新しい画像を即座に読み込む
           loadAllImages();
         }
       }
@@ -602,6 +642,10 @@ window.addEventListener('beforeunload', () => {
   if (pollInterval) {
     clearInterval(pollInterval);
     console.log('Poll interval cleared');
+  }
+  if (likesChannel) {
+    likesChannel.unsubscribe();
+    console.log('Likes channel unsubscribed');
   }
   if (photosChannel) {
     photosChannel.unsubscribe();
