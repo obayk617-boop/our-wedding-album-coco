@@ -1,257 +1,420 @@
 /* =====================
-全体
+リセット & 基本スタイル
 ===================== */
 
-body{
-  margin:0;
-  font-family:sans-serif;
-  background:#f5f5f5;
-  text-align:center;
+* {
+  box-sizing: border-box;
 }
 
-h1{
-  margin:20px 0;
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f8f8f8;
+  color: #333;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  font-family: inherit;
+}
+
+/* =====================
+ヘッダー
+===================== */
+
+.header {
+  background: linear-gradient(135deg, #ff4081 0%, #f50057 100%);
+  color: white;
+  padding: 20px 16px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.95;
+  line-height: 1.5;
+  font-weight: 500;
 }
 
 /* =====================
 ギャラリー
 ===================== */
 
-#gallery{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
-  gap:6px;
-  padding:10px;
+.gallery-container {
+  padding: 16px 8px;
+  margin-bottom: 80px;
 }
 
-#gallery img{
-  width:100%;
-  height:120px;
-  object-fit:cover;
-  border-radius:6px;
-  cursor:pointer;
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.gallery img:active {
+  transform: scale(0.95);
+  box-shadow: 0 4px 12px rgba(255, 64, 129, 0.3);
 }
 
 /* =====================
 ＋ボタン
 ===================== */
 
-#fab{
-  position:fixed;
-  bottom:20px;
-  right:20px;
+.fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff4081 0%, #f50057 100%);
+  color: white;
+  font-size: 32px;
+  font-weight: bold;
+  border: none;
+  box-shadow: 0 4px 16px rgba(255, 64, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.3s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
 
-  width:60px;
-  height:60px;
-
-  border-radius:50%;
-  background:#ff4081;
-  color:white;
-
-  font-size:32px;
-
-  display:flex;
-  align-items:center;
-  justify-content:center;
-
-  box-shadow:0 6px 16px rgba(0,0,0,.3);
-
-  cursor:pointer;
-  z-index:50;
+.fab:active {
+  transform: scale(0.9);
+  box-shadow: 0 2px 8px rgba(255, 64, 129, 0.3);
 }
 
 /* =====================
 メニュー
 ===================== */
 
-#menu{
-  position:fixed;
-  bottom:90px;
-  right:20px;
-
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-
-  transform:translateY(30px);
-  opacity:0;
-
-  pointer-events:none;
-
-  transition:all .25s ease;
-
-  z-index:40;
+.menu {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 40;
 }
 
-#menu.show{
-  transform:translateY(0);
-  opacity:1;
-  pointer-events:auto;
+.menu.hidden {
+  display: none;
 }
 
-#menu button{
-  padding:12px 16px;
-  border:none;
-  border-radius:20px;
-  background:white;
-  color:#333;
-  font-size:14px;
-  box-shadow:0 4px 12px rgba(0,0,0,.2);
-  cursor:pointer;
+.menu-btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-/* =====================
-モーダル
-===================== */
-
-#previewModal{
-  position:fixed;
-  top:0;
-  left:0;
-
-  width:100%;
-  height:100%;
-
-  background:rgba(0,0,0,.7);
-
-  display:flex;
-  align-items:center;
-  justify-content:center;
-
-  z-index:200;
-}
-
-.modalContent{
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  width:90%;
-  max-width:320px;
-}
-
-.modalContent img{
-  width:100%;
-  border-radius:8px;
-}
-
-.modalContent button{
-  margin:10px 5px;
-  padding:10px 16px;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-
-#confirmUpload{
-  background:#4caf50;
-  color:white;
-}
-
-#cancelUpload{
-  background:#ccc;
-}
-
-/* =====================
-スピナー
-===================== */
-
-#spinner{
-  margin:10px auto;
-
-  width:30px;
-  height:30px;
-
-  border:4px solid #ddd;
-  border-top:4px solid #ff4081;
-
-  border-radius:50%;
-
-  animation:spin 1s linear infinite;
-}
-
-@keyframes spin{
-  from{transform:rotate(0)}
-  to{transform:rotate(360deg)}
+.menu-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* =====================
 画像ビューア
 ===================== */
 
-#viewer{
-  position:fixed;
-  top:0;
-  left:0;
-
-  width:100%;
-  height:100%;
-
-  background:rgba(0,0,0,.9);
-
-  display:flex;
-  flex-direction:column;
-
-  align-items:center;
-  justify-content:center;
-
-  z-index:100;
+.viewer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.3s ease;
 }
 
-/* 拡大画像 */
-
-#viewer img{
-  max-width:90%;
-  max-height:75%;
-  border-radius:8px;
+.viewer.hidden {
+  display: none;
 }
 
-/* 閉じるボタン */
-
-#closeViewer{
-  position:absolute;
-  top:20px;
-  right:20px;
-
-  font-size:28px;
-  background:none;
-  border:none;
-
-  color:white;
-  cursor:pointer;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-/* ダウンロード */
-
-#downloadBtn{
-  margin-top:20px;
-  
-  padding:12px 20px;
-  
-  background:#ff4081;
-  color:white;
-  
-  border-radius:25px;
-  
-  text-decoration:none;
-  
-  font-size:16px;
-  
-  display:inline-block;
-  cursor:pointer;
-  position:relative;
-  z-index:101;
+.close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-#downloadBtn:hover{
-  background:#f50057;
-  transform:scale(1.05);
-  transition:all 0.2s ease;
+.close-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.9);
+}
+
+.viewer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 20px;
+  max-width: 100%;
+}
+
+.viewer img {
+  max-width: 90%;
+  max-height: 65%;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.download-btn {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #ff4081 0%, #f50057 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255, 64, 129, 0.4);
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.download-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(255, 64, 129, 0.3);
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =====================
+モーダル
+===================== */
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 320px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h2 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.modal-content img {
+  width: 100%;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.status-text {
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  margin: 8px 0;
+  min-height: 20px;
+}
+
+/* =====================
+スピナー
+===================== */
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 12px auto;
+  border: 3px solid rgba(255, 64, 129, 0.2);
+  border-top-color: #ff4081;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =====================
+ボタングループ
+===================== */
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.btn-primary {
+  background: #ff4081;
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 64, 129, 0.3);
+}
+
+.btn-primary:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(255, 64, 129, 0.2);
+}
+
+.btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.btn-secondary:active {
+  transform: scale(0.95);
+  background: #d0d0d0;
 }
 
 /* =====================
 非表示
 ===================== */
 
-.hidden{
-  display:none !important;
+.hidden {
+  display: none !important;
+}
+
+/* =====================
+タッチ最適化
+===================== */
+
+@media (hover: none) and (pointer: coarse) {
+  .gallery img:hover {
+    transform: none;
+  }
+  
+  .menu-btn:hover {
+    background: #f5f5f5;
+  }
+  
+  .btn:hover {
+    transform: none;
+  }
+}
+
+/* =====================
+暗いテーマ対応
+===================== */
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #121212;
+    color: #fff;
+  }
+  
+  .modal-content {
+    background: #1e1e1e;
+    color: #fff;
+  }
+  
+  .menu-btn {
+    background: #2c2c2c;
+    color: #fff;
+  }
+  
+  .status-text {
+    color: #bbb;
+  }
 }

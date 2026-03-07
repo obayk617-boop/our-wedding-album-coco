@@ -3,67 +3,72 @@
 <head>
   <meta charset="UTF-8" />
   <title>Wedding Album</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#ff4081" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Wedding Album" />
 
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
 
-  <h1>Wedding Album</h1>
-
-  <hr />
+  <!-- ヘッダー -->
+  <header class="header">
+    <h1>💍 Wedding Album</h1>
+    <p class="subtitle">写真を保存：タップしてダウンロード📥 or 長押しして保存💾</p>
+  </header>
 
   <!-- ギャラリー -->
-  <div id="gallery"></div>
-
+  <main class="gallery-container">
+    <div id="gallery" class="gallery"></div>
+  </main>
 
   <!-- 画像拡大ビュー -->
-  <div id="viewer" class="hidden">
+  <div id="viewer" class="viewer hidden">
 
-    <button id="closeViewer">×</button>
+    <button id="closeViewer" class="close-btn">✕</button>
 
-    <img id="viewerImg">
-
-    <a id="downloadBtn" download>⬇ ダウンロード</a>
+    <div class="viewer-content">
+      <img id="viewerImg" alt="Wedding Photo">
+      <button id="downloadBtn" class="download-btn">📥 保存</button>
+    </div>
 
   </div>
-
 
   <!-- ＋ボタン -->
-  <div id="fab">＋</div>
-
+  <div id="fab" class="fab">＋</div>
 
   <!-- メニュー -->
-  <div id="menu" class="hidden">
-    <button id="cameraBtn">📷 カメラ</button>
-    <button id="fileBtn">🖼 アルバム</button>
+  <div id="menu" class="menu hidden">
+    <button id="cameraBtn" class="menu-btn">📷 カメラで撮影</button>
+    <button id="fileBtn" class="menu-btn">🖼 アルバムから選択</button>
   </div>
 
-
   <!-- アップロード確認モーダル -->
-  <div id="previewModal" class="hidden">
-    <div class="modalContent">
+  <div id="previewModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>写真をアップロード</h2>
 
-      <img id="previewImage">
+      <img id="previewImage" alt="Preview">
 
-      <p id="uploadStatus"></p>
+      <p id="uploadStatus" class="status-text"></p>
+      <div id="spinner" class="spinner hidden"></div>
 
-      <div id="spinner" class="hidden"></div>
-
-      <br>
-
-      <button id="confirmUpload">アップロード</button>
-      <button id="cancelUpload">キャンセル</button>
+      <div class="button-group">
+        <button id="confirmUpload" class="btn btn-primary">✓ アップロード</button>
+        <button id="cancelUpload" class="btn btn-secondary">✕ キャンセル</button>
+      </div>
 
     </div>
   </div>
 
-
   <!-- input -->
   <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
   <input type="file" id="fileSelectInput" accept="image/*" hidden>
-
 
   <!-- JSは最後 -->
   <script type="module" src="app.js"></script>
