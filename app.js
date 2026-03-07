@@ -38,6 +38,62 @@ let selectedFile = null;
 let currentImageUrl = null;
 
 /* ==========================
+トースト通知
+========================== */
+
+function showToast(message, duration = 2000) {
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 14px;
+    z-index: 999;
+    animation: slideUp 0.3s ease;
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = "slideDown 0.3s ease";
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// アニメーション定義
+const style = document.createElement("style");
+style.textContent = `
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(-50%) translateY(20px);
+    }
+  }
+`;
+document.head.appendChild(style);
+
+/* ==========================
 Viewer - モバイル対応版
 ========================== */
 
@@ -58,7 +114,7 @@ viewerImg.onclick = (e) => {
   e.stopPropagation();
 };
 
-// ダウンロードボタン - スマホアルバムに保存
+// ダウンロードボタン - スマホアルバムに直接保存
 downloadBtn.onclick = async (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -67,38 +123,53 @@ downloadBtn.onclick = async (e) => {
   
   try {
     downloadBtn.disabled = true;
+    const originalText = downloadBtn.textContent;
     downloadBtn.textContent = "保存中…";
     
+    // 画像をfetchして、CanvasAPIで処理
     const response = await fetch(currentImageUrl);
     const blob = await response.blob();
     
-    // モバイル環境での処理
-    if (navigator.share) {
-      // Share APIが利用可能な場合
-      const file = new File([blob], "wedding-photo.jpg", { type: "image/jpeg" });
-      await navigator.share({
-        files: [file],
-        title: "Wedding Photo",
-        text: "Wedding Album Photo"
-      });
-    } else {
-      // フォールバック: Blob URLをダウンロード
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = "wedding-photo.jpg";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    }
+    // HTMLCanvasを使用してダウンロード（モバイルフレンドリー）
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
     
-    downloadBtn.textContent = "⬇ ダウンロード";
-    downloadBtn.disabled = false;
+    img.onload = async () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      
+      // ブラウザのダウンロード機能を使用
+      canvas.toBlob((canvasBlob) => {
+        const url = URL.createObjectURL(canvasBlob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `wedding-${Date.now()}.jpg`;
+        
+        // トリガー
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        // 成功メッセージと自動閉じる
+        downloadBtn.textContent = originalText;
+        downloadBtn.disabled = false;
+        
+        showToast("📸 写真を保存しました！");
+        
+        setTimeout(() => {
+          viewer.classList.add("hidden");
+        }, 1500);
+      }, "image/jpeg", 0.95);
+    };
+    
+    img.src = URL.createObjectURL(blob);
     
   } catch (error) {
-    console.error("ダウンロード失敗:", error);
-    alert("保存に失敗しました");
+    console.error("保存失敗:", error);
+    showToast("❌ 保存に失敗しました");
     downloadBtn.textContent = "⬇ ダウンロード";
     downloadBtn.disabled = false;
   }
@@ -292,7 +363,7 @@ confirmUpload.onclick = async () => {
   if (error) {
 
     uploadStatus.textContent = "";
-    alert("アップロード失敗");
+    showToast("❌ アップロード失敗");
 
     confirmUpload.disabled = false;
     cancelUpload.disabled = false;
@@ -303,6 +374,8 @@ confirmUpload.onclick = async () => {
 
   uploadStatus.textContent = "アップロード完了！";
   spinner.classList.add("hidden");
+
+  showToast("✅ アップロードしました！");
 
   setTimeout(() => {
 
