@@ -126,46 +126,48 @@ downloadBtn.onclick = async (e) => {
     const originalText = downloadBtn.textContent;
     downloadBtn.textContent = "保存中…";
     
-    // 画像をfetchして、CanvasAPIで処理
+    // 画像をfetch
     const response = await fetch(currentImageUrl);
     const blob = await response.blob();
     
-    // HTMLCanvasを使用してダウンロード（モバイルフレンドリー）
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    
-    img.onload = async () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
+    // Web Share API を使用（モバイルネイティブ保存）
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], "photo.jpg", { type: "image/jpeg" })] })) {
+      const file = new File([blob], `wedding-${Date.now()}.jpg`, { type: "image/jpeg" });
       
-      // ブラウザのダウンロード機能を使用
-      canvas.toBlob((canvasBlob) => {
-        const url = URL.createObjectURL(canvasBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `wedding-${Date.now()}.jpg`;
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Wedding Photo",
+          text: "Wedding Album Photo"
+        });
         
-        // トリガー
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        // 成功メッセージと自動閉じる
-        downloadBtn.textContent = originalText;
-        downloadBtn.disabled = false;
-        
+        // Share後は通知を表示して閉じる
         showToast("📸 写真を保存しました！");
-        
         setTimeout(() => {
           viewer.classList.add("hidden");
         }, 1500);
-      }, "image/jpeg", 0.95);
-    };
+        
+      } catch (err) {
+        // ユーザーがキャンセルした場合
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          showToast("❌ 保存に失敗しました");
+        }
+      }
+      
+    } else {
+      // Fallback: 画像を新しいタブで開く（スマホならアルバムで保存できる）
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      
+      showToast("📸 画像を開きました");
+      setTimeout(() => {
+        viewer.classList.add("hidden");
+      }, 1500);
+    }
     
-    img.src = URL.createObjectURL(blob);
+    downloadBtn.textContent = originalText;
+    downloadBtn.disabled = false;
     
   } catch (error) {
     console.error("保存失敗:", error);
