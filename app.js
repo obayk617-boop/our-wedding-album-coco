@@ -36,6 +36,7 @@ const cancelUpload = document.getElementById("cancelUpload");
 
 let selectedFile = null;
 let currentImageUrl = null;
+let menuOpen = false;
 
 /* ==========================
 トースト通知
@@ -94,27 +95,23 @@ style.textContent = `
 document.head.appendChild(style);
 
 /* ==========================
-Viewer - モバイル対応版
+Viewer
 ========================== */
 
-// 背景クリックで閉じる
 viewer.onclick = (e) => {
   if (e.target === viewer) {
     viewer.classList.add("hidden");
   }
 };
 
-// ×ボタンで閉じる
 closeViewer.onclick = () => {
   viewer.classList.add("hidden");
 };
 
-// 画像クリックでは閉じない
 viewerImg.onclick = (e) => {
   e.stopPropagation();
 };
 
-// ダウンロードボタン - スマホアルバムに直接保存
 downloadBtn.onclick = async (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -126,11 +123,9 @@ downloadBtn.onclick = async (e) => {
     const originalText = downloadBtn.textContent;
     downloadBtn.textContent = "保存中…";
     
-    // 画像をfetch
     const response = await fetch(currentImageUrl);
     const blob = await response.blob();
     
-    // Web Share API を使用（モバイルネイティブ保存）
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], "photo.jpg", { type: "image/jpeg" })] })) {
       const file = new File([blob], `wedding-${Date.now()}.jpg`, { type: "image/jpeg" });
       
@@ -141,14 +136,12 @@ downloadBtn.onclick = async (e) => {
           text: "Wedding Album Photo"
         });
         
-        // Share後は通知を表示して閉じる
         showToast("📸 写真を保存しました！");
         setTimeout(() => {
           viewer.classList.add("hidden");
         }, 1500);
         
       } catch (err) {
-        // ユーザーがキャンセルした場合
         if (err.name !== 'AbortError') {
           console.error(err);
           showToast("❌ 保存に失敗しました");
@@ -156,7 +149,6 @@ downloadBtn.onclick = async (e) => {
       }
       
     } else {
-      // Fallback: 画像を新しいタブで開く（スマホならアルバムで保存できる）
       const blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, '_blank');
       
@@ -172,7 +164,7 @@ downloadBtn.onclick = async (e) => {
   } catch (error) {
     console.error("保存失敗:", error);
     showToast("❌ 保存に失敗しました");
-    downloadBtn.textContent = "⬇ ダウンロード";
+    downloadBtn.textContent = "📥 保存";
     downloadBtn.disabled = false;
   }
 };
@@ -243,8 +235,10 @@ async function loadImages() {
       viewerImg.src = img.src;
       currentImageUrl = img.src;
       
-      // モーダルを表示
       viewer.classList.remove("hidden");
+      
+      // メニュー閉じる
+      closeMenu();
 
     };
 
@@ -280,44 +274,52 @@ supabaseClient
   .subscribe();
 
 /* ==========================
-＋ボタン
+メニュー開閉
 ========================== */
 
-let menuOpen = false;
+function openMenu() {
+  menuOpen = true;
+  menu.classList.remove("hidden");
+  menu.classList.add("show");
+}
 
-fab.onclick = () => {
-  menuOpen = !menuOpen;
-  
+function closeMenu() {
+  menuOpen = false;
+  menu.classList.remove("show");
+  menu.classList.add("hidden");
+}
+
+function toggleMenu() {
   if (menuOpen) {
-    menu.classList.remove("hidden");
+    closeMenu();
   } else {
-    menu.classList.add("hidden");
+    openMenu();
   }
+}
+
+// ＋ボタン
+fab.onclick = (e) => {
+  e.stopPropagation();
+  toggleMenu();
 };
 
-/* FAB外をクリックしてメニューを閉じる */
-document.addEventListener("click", (e) => {
-  if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) {
-    menu.classList.add("hidden");
-    menuOpen = false;
-  }
-});
-
-/* ==========================
-カメラ
-========================== */
-
+// メニューボタン
 cameraBtn.onclick = () => {
   cameraInput.click();
+  closeMenu();
 };
-
-/* ==========================
-アルバム
-========================== */
 
 fileBtn.onclick = () => {
   fileSelectInput.click();
+  closeMenu();
 };
+
+// ページ全体をクリックしてメニュー閉じる
+document.addEventListener("click", (e) => {
+  if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) {
+    closeMenu();
+  }
+});
 
 /* ==========================
 ファイル選択
@@ -335,7 +337,6 @@ function handleFile(e) {
   previewImage.src = URL.createObjectURL(selectedFile);
 
   previewModal.classList.remove("hidden");
-  menu.classList.add("hidden");
 
 }
 
