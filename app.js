@@ -139,22 +139,32 @@ document.head.appendChild(style);
 ========================== */
 
 async function getLikesForImage(fileName) {
-  const { count } = await supabaseClient
-    .from("likes")
-    .select("*", { count: "exact", head: true })
-    .eq("file_name", fileName);
-  
-  return count || 0;
+  try {
+    const { count } = await supabaseClient
+      .from("likes")
+      .select("*", { count: "exact", head: true })
+      .eq("file_name", fileName);
+    
+    return count || 0;
+  } catch (error) {
+    console.error("いいね数取得エラー:", error);
+    return 0;
+  }
 }
 
 async function checkUserLike(fileName) {
-  const { data } = await supabaseClient
-    .from("likes")
-    .select("id")
-    .eq("file_name", fileName)
-    .eq("user_id", currentUserId);
-  
-  return data && data.length > 0;
+  try {
+    const { data } = await supabaseClient
+      .from("likes")
+      .select("id")
+      .eq("file_name", fileName)
+      .eq("user_id", currentUserId);
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error("ユーザーいいね確認エラー:", error);
+    return false;
+  }
 }
 
 async function toggleLike(fileName) {
@@ -479,48 +489,83 @@ displayMoreImages = function() {
 updateObserver();
 
 /* ==========================
-Realtime - いいね更新
+Realtime - いいね更新（修正版）
 ========================== */
 
-// 新しい写真追加の監視
-supabaseClient
-  .channel("photos-realtime")
-  .on(
-    "postgres_changes",
-    {
-      event: "INSERT",
-      schema: "storage",
-      table: "objects"
-    },
-    (payload) => {
-      if (payload.new.bucket_id === "photos") {
-        loadAllImages();
-      }
-    }
-  )
-  .subscribe();
+// リアルタイムチャンネル設定
+let photosChannel = null;
+let likesChannel = null;
 
-// いいね更新のリアルタイム監視（重要）
-supabaseClient
-  .channel("likes-realtime")
-  .on(
-    "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "likes"
-    },
-    async (payload) => {
-      const fileName = payload.new?.file_name || payload.old?.file_name;
-      if (fileName) {
-        // いいね数を再取得（ローカル計算ではなく）
-        const newCount = await getLikesForImage(fileName);
-        likesCache[fileName] = newCount;
-        updateLikeButtons(fileName);
-      }
+function setupRealtimeListeners() {
+  // いいね更新のリアルタイム監視
+  likesChannel = supabaseClient.channel('public:likes', {
+    config: {
+      broadcast: { self: true },
+      presence: { key: currentUserId }
     }
-  )
-  .subscribe();
+  });
+
+  likesChannel
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'likes'
+      },
+      (payload) => {
+        console.log('いいね更新受信:', payload);
+        const fileName = payload.new?.file_name || payload.old?.file_name;
+        
+        if (fileName) {
+          // 全いいね数を即座に更新
+          getLikesForImage(fileName).then(count => {
+            likesCache[fileName] = count;
+            updateLikeButtons(fileName);
+          });
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Likes channel status:', status);
+    });
+
+  // 新しい写真追加の監視
+  photosChannel = supabaseClient.channel('public:objects', {
+    config: {
+      broadcast: { self: true },
+      presence: { key: currentUserId }
+    }
+  });
+
+  photosChannel
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'storage',
+        table: 'objects'
+      },
+      (payload) => {
+        console.log('写真追加受信:', payload);
+        if (payload.new.bucket_id === "photos") {
+          loadAllImages();
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Photos channel status:', status);
+    });
+}
+
+// リアルタイムリスナー開始
+setupRealtimeListeners();
+
+// ページを離れる時にチャンネルをクリーンアップ
+window.addEventListener('beforeunload', () => {
+  if (likesChannel) likesChannel.unsubscribe();
+  if (photosChannel) photosChannel.unsubscribe();
+});
 
 /* ==========================
 メニュー開閉
