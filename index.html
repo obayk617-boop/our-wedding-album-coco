@@ -9,40 +9,64 @@
 </head>
 
 <body>
+
   <h1>Wedding Album</h1>
 
   <hr />
 
+  <!-- ギャラリー -->
   <div id="gallery"></div>
 
+
   <!-- 画像拡大ビュー -->
-  <div id="viewer">
+  <div id="viewer" class="hidden">
+
+    <button id="closeViewer">×</button>
+
     <img id="viewerImg">
+
+    <a id="downloadBtn" download>⬇ ダウンロード</a>
+
   </div>
 
-  <script type="module" src="app.js"></script>
+
   <!-- ＋ボタン -->
   <div id="fab">＋</div>
 
+
   <!-- メニュー -->
-  <div id="menu">
+  <div id="menu" class="hidden">
     <button id="cameraBtn">📷 カメラ</button>
     <button id="fileBtn">🖼 アルバム</button>
   </div>
 
-  <!-- 確認モーダル -->
+
+  <!-- アップロード確認モーダル -->
   <div id="previewModal" class="hidden">
     <div class="modalContent">
+
       <img id="previewImage">
+
       <p id="uploadStatus"></p>
+
       <div id="spinner" class="hidden"></div>
+
       <br>
+
       <button id="confirmUpload">アップロード</button>
       <button id="cancelUpload">キャンセル</button>
+
     </div>
   </div>
 
+
+  <!-- input -->
   <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
   <input type="file" id="fileSelectInput" accept="image/*" hidden>
+
+
+  <!-- JSは最後 -->
+  <script type="module" src="app.js"></script>
+
 </body>
 </html>
