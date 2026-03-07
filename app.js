@@ -65,6 +65,7 @@ let isLoading = false;
 let likesCache = {};
 let userLikes = {};
 let isInitialLoadDone = false;
+let lastCheckedPhotoCount = 0;
 
 /* ==========================
 トースト通知
@@ -147,7 +148,7 @@ async function getLikesForImage(fileName) {
     
     if (error) {
       console.warn(`Like count error for ${fileName}:`, error.message);
-      return likesCache[fileName] || 0; // エラー時は前回の値を返す
+      return likesCache[fileName] || 0;
     }
     
     return count || 0;
@@ -367,10 +368,29 @@ async function loadAllImages() {
   if (!isInitialLoadDone) {
     isInitialLoadDone = true;
     loadLikesData();
-  } else {
+  } else if (photosAdded > 0) {
     // 新しい画像のみいいね数を読み込む
     const newPhotos = allFiles.slice(0, photosAdded);
     for (const file of newPhotos) {
+      try {
+        const count = await getLikesForImage(file.name);
+        likesCache[file.name] = count;
+        
+        const isLiked = await checkUserLike(file.name);
+        userLikes[file.name] = isLiked;
+        
+        updateLikeButtons(file.name);
+      } catch (error) {
+        console.error(`Error loading likes for ${file.name}:`, error);
+      }
+    }
+  }
+}
+
+// いいねデータを非同期で読み込む
+async function loadLikesData() {
+  for (const file of allFiles) {
+    try {
       const count = await getLikesForImage(file.name);
       likesCache[file.name] = count;
       
@@ -378,6 +398,8 @@ async function loadAllImages() {
       userLikes[file.name] = isLiked;
       
       updateLikeButtons(file.name);
+    } catch (error) {
+      console.error(`Error loading likes for ${file.name}:`, error);
     }
   }
 }
@@ -509,7 +531,6 @@ Realtime - 新規画像は自動表示 + いいねはポーリング
 
 let photosChannel = null;
 let pollInterval = null;
-let lastCheckedPhotoCount = 0;
 
 function setupRealtimeListeners() {
   console.log('Setting up realtime listeners...');
@@ -522,7 +543,7 @@ function setupRealtimeListeners() {
     
     if (fileNamesToCheck.length === 0) return;
     
-    // 同時リクエス��数を制限
+    // 同時リクエスト数を制限
     const MAX_CONCURRENT = 5;
     for (let i = 0; i < fileNamesToCheck.length; i += MAX_CONCURRENT) {
       const batch = fileNamesToCheck.slice(i, i + MAX_CONCURRENT);
