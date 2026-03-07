@@ -328,7 +328,7 @@ async function compressImage(file, maxWidth = 1280, quality = 0.7) {
 }
 
 /* ==========================
-Gallery - 最適化版
+Gallery - 最適化版（新規画像検出）
 ========================== */
 
 async function loadAllImages() {
@@ -345,30 +345,40 @@ async function loadAllImages() {
     return;
   }
 
-  allFiles = data || [];
+  const newFiles = data || [];
+  
+  // 新しい画像があったかチェック
+  const newPhotoCount = newFiles.length;
+  const photosAdded = newPhotoCount - lastCheckedPhotoCount;
+  
+  if (photosAdded > 0) {
+    console.log(`新しい画像が${photosAdded}個追加されました`);
+    lastCheckedPhotoCount = newPhotoCount;
+  }
+
+  allFiles = newFiles;
   displayedCount = 0;
   gallery.innerHTML = "";
   
-  // 初期ロードは非同期で行う（ページ表示を遅延させない）
+  // 最初の画像を読み込む
   displayMoreImages();
   
-  // バックグラウンドでいいねデータを取得
+  // 新しい画像のいいね数を読み込む（バックグラウンド）
   if (!isInitialLoadDone) {
     isInitialLoadDone = true;
     loadLikesData();
-  }
-}
-
-// いいねデータを非同期で読み込む
-async function loadLikesData() {
-  for (const file of allFiles) {
-    const count = await getLikesForImage(file.name);
-    likesCache[file.name] = count;
-    
-    const isLiked = await checkUserLike(file.name);
-    userLikes[file.name] = isLiked;
-    
-    updateLikeButtons(file.name);
+  } else {
+    // 新しい画像のみいいね数を読み込む
+    const newPhotos = allFiles.slice(0, photosAdded);
+    for (const file of newPhotos) {
+      const count = await getLikesForImage(file.name);
+      likesCache[file.name] = count;
+      
+      const isLiked = await checkUserLike(file.name);
+      userLikes[file.name] = isLiked;
+      
+      updateLikeButtons(file.name);
+    }
   }
 }
 
@@ -494,36 +504,34 @@ displayMoreImages = function() {
 updateObserver();
 
 /* ==========================
-Realtime - ポーリング方式（最適化版 v2）
+Realtime - 新規画像は自動表示 + いいねはポーリング
 ========================== */
 
 let photosChannel = null;
 let pollInterval = null;
-let lastPollTime = 0;
-const POLL_INTERVAL = 3000; // 3秒に延長
-const MAX_CONCURRENT_REQUESTS = 3; // 同時リクエスト数を制限
+let lastCheckedPhotoCount = 0;
 
 function setupRealtimeListeners() {
   console.log('Setting up realtime listeners...');
   
-  // 定期的にいいね数を更新（ただし表示されている画像のみ）
+  // 定期的にいいね数を更新（表示されている画像のみ）
   pollInterval = setInterval(async () => {
-    // 現在画面に表示されている画像のみ取得
+    // 現在画面に表示されている画像のいいね数のみ更新
     const visibleImages = document.querySelectorAll('[data-like-btn]');
     const fileNamesToCheck = Array.from(visibleImages).map(btn => btn.getAttribute('data-like-btn'));
     
     if (fileNamesToCheck.length === 0) return;
     
-    // 同時リクエスト数を制限して順番に処理
-    for (let i = 0; i < fileNamesToCheck.length; i += MAX_CONCURRENT_REQUESTS) {
-      const batch = fileNamesToCheck.slice(i, i + MAX_CONCURRENT_REQUESTS);
+    // 同時リクエス��数を制限
+    const MAX_CONCURRENT = 5;
+    for (let i = 0; i < fileNamesToCheck.length; i += MAX_CONCURRENT) {
+      const batch = fileNamesToCheck.slice(i, i + MAX_CONCURRENT);
       
       await Promise.all(
         batch.map(async (fileName) => {
           try {
             const count = await getLikesForImage(fileName);
             
-            // いいね数が変わった場合のみ更新
             if (count !== likesCache[fileName]) {
               console.log(`${fileName}: ${likesCache[fileName]} → ${count}`);
               likesCache[fileName] = count;
@@ -535,12 +543,34 @@ function setupRealtimeListeners() {
         })
       );
       
-      // バッチ間に少し待機
-      if (i + MAX_CONCURRENT_REQUESTS < fileNamesToCheck.length) {
+      if (i + MAX_CONCURRENT < fileNamesToCheck.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-  }, POLL_INTERVAL); // 3秒ごと
+  }, 3000); // 3秒ごと
+
+  // 新しい写真追加の監視
+  photosChannel = supabaseClient.channel('public:objects');
+
+  photosChannel
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'storage',
+        table: 'objects'
+      },
+      (payload) => {
+        console.log('新しい写真が追加されました:', payload);
+        if (payload.new.bucket_id === "photos") {
+          // 新しい画像を即座に読み込む
+          loadAllImages();
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Photos channel status:', status);
+    });
 }
 
 // リアルタイムリスナー開始
