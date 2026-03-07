@@ -62,8 +62,9 @@ let allFiles = [];
 let displayedCount = 0;
 const itemsPerPage = 12;
 let isLoading = false;
-let likesCache = {}; // ファイル名: いいね数のキャッシュ
-let userLikes = {}; // ファイル名: ユーザーがいいねしたかどうか
+let likesCache = {};
+let userLikes = {};
+let isInitialLoadDone = false;
 
 /* ==========================
 トースト通知
@@ -134,7 +135,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 /* ==========================
-いいね機能
+いいね機能 - 最適化版
 ========================== */
 
 async function getLikesForImage(fileName) {
@@ -161,7 +162,6 @@ async function toggleLike(fileName) {
     const hasLiked = await checkUserLike(fileName);
     
     if (hasLiked) {
-      // いいねを削除
       await supabaseClient
         .from("likes")
         .delete()
@@ -169,8 +169,8 @@ async function toggleLike(fileName) {
         .eq("user_id", currentUserId);
       
       userLikes[fileName] = false;
+      likesCache[fileName] = Math.max(0, (likesCache[fileName] || 0) - 1);
     } else {
-      // いいねを追加
       await supabaseClient
         .from("likes")
         .insert([
@@ -181,11 +181,9 @@ async function toggleLike(fileName) {
         ]);
       
       userLikes[fileName] = true;
+      likesCache[fileName] = (likesCache[fileName] || 0) + 1;
     }
     
-    // いいね数を更新
-    const newCount = await getLikesForImage(fileName);
-    likesCache[fileName] = newCount;
     updateLikeButtons(fileName);
     
   } catch (error) {
@@ -194,7 +192,6 @@ async function toggleLike(fileName) {
 }
 
 function updateLikeButtons(fileName) {
-  // ギャラリー内のボタン
   const likeBtn = document.querySelector(`[data-like-btn="${fileName}"]`);
   if (likeBtn) {
     const count = likesCache[fileName] || 0;
@@ -316,7 +313,7 @@ async function compressImage(file, maxWidth = 1280, quality = 0.7) {
 }
 
 /* ==========================
-Gallery - いいね機能付き
+Gallery - 最適化版
 ========================== */
 
 async function loadAllImages() {
@@ -337,13 +334,27 @@ async function loadAllImages() {
   displayedCount = 0;
   gallery.innerHTML = "";
   
-  // 全画像のいいね数を取得
-  for (const file of allFiles) {
-    likesCache[file.name] = await getLikesForImage(file.name);
-    userLikes[file.name] = await checkUserLike(file.name);
-  }
-  
+  // 初期ロードは非同期で行う（ページ表示を遅延させない）
   displayMoreImages();
+  
+  // バックグラウンドでいいねデータを取得
+  if (!isInitialLoadDone) {
+    isInitialLoadDone = true;
+    loadLikesData();
+  }
+}
+
+// いいねデータを非同期で読み込む
+async function loadLikesData() {
+  for (const file of allFiles) {
+    const count = await getLikesForImage(file.name);
+    likesCache[file.name] = count;
+    
+    const isLiked = await checkUserLike(file.name);
+    userLikes[file.name] = isLiked;
+    
+    updateLikeButtons(file.name);
+  }
 }
 
 function displayMoreImages() {
@@ -468,9 +479,10 @@ displayMoreImages = function() {
 updateObserver();
 
 /* ==========================
-Realtime
+Realtime - いいね更新
 ========================== */
 
+// 新しい写真追加の監視
 supabaseClient
   .channel("photos-realtime")
   .on(
@@ -481,16 +493,14 @@ supabaseClient
       table: "objects"
     },
     (payload) => {
-
       if (payload.new.bucket_id === "photos") {
         loadAllImages();
       }
-
     }
   )
   .subscribe();
 
-// いいね更新のリアルタイム監視
+// いいね更新のリアルタイム監視（重要）
 supabaseClient
   .channel("likes-realtime")
   .on(
@@ -503,7 +513,9 @@ supabaseClient
     async (payload) => {
       const fileName = payload.new?.file_name || payload.old?.file_name;
       if (fileName) {
-        likesCache[fileName] = await getLikesForImage(fileName);
+        // いいね数を再取得（ローカル計算ではなく）
+        const newCount = await getLikesForImage(fileName);
+        likesCache[fileName] = newCount;
         updateLikeButtons(fileName);
       }
     }
