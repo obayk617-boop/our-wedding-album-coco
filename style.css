@@ -20,7 +20,15 @@ html, body {
   width: 100%;
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: #f8f8f8;
+  /* スクロールしても動かない固定グラデーション */
+  background: linear-gradient(180deg,
+    #5ecfea 0%,
+    #8addf0 25%,
+    #b3ecf8 55%,
+    #cef4fd 75%,
+    #c2eef9 100%
+  );
+  background-attachment: fixed;
   color: #333;
 }
 
@@ -102,7 +110,6 @@ button {
 .gallery-container {
   padding: 16px 8px;
   margin-bottom: 80px;
-  background: linear-gradient(180deg, #e8f8fc 0%, #f0fbff 40%, #e4f5fa 100%);
   min-height: 100vh;
 }
 
