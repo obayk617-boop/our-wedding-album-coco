@@ -206,7 +206,7 @@ button {
 
 .close-btn {
   position: absolute;
-  top: 16px;
+  top: calc(16px + env(safe-area-inset-top));
   right: 16px;
   font-size: 24px;
   background: rgba(255, 255, 255, 0.2);
@@ -222,6 +222,7 @@ button {
   transition: all 0.2s ease;
   -webkit-user-select: none;
   user-select: none;
+  z-index: 101;
 }
 
 .close-btn:active {
@@ -236,6 +237,14 @@ button {
   gap: 24px;
   padding: 20px;
   max-width: 100%;
+  /* viewer-content の外側（暗い余白）タップを viewer に伝える */
+  pointer-events: none;
+}
+
+/* viewer-content の中の操作可能な要素は個別に有効化 */
+.viewer-content img,
+.viewer-content button {
+  pointer-events: auto;
 }
 
 .viewer img {

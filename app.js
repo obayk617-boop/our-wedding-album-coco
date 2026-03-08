@@ -245,6 +245,9 @@ function updateLikeButtons(fileName) {
 Viewer
 ========================== */
 
+// 背景（暗い余白部分）タップで閉じる
+// viewer-content の pointer-events:none により、
+// 画像・ボタン以外のタップはすべて viewer に届く
 viewer.onclick = (e) => {
   if (e.target === viewer) {
     viewer.classList.add("hidden");
@@ -253,10 +256,6 @@ viewer.onclick = (e) => {
 
 closeViewer.onclick = () => {
   viewer.classList.add("hidden");
-};
-
-viewerImg.onclick = (e) => {
-  e.stopPropagation();
 };
 
 downloadBtn.onclick = async (e) => {
