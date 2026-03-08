@@ -384,6 +384,7 @@ async function loadAllImages() {
     gallery.innerHTML = "";
 
     displayMoreImages();
+    updateObserver(); // DOM追加直後に確実に監視開始
 
     // 表示中の先頭をバルク取得
     const initialNames = allFiles.slice(0, itemsPerPage).map(f => f.name);
@@ -524,8 +525,7 @@ const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting && displayedCount < allFiles.length) {
       displayMoreImages();
-      // DOM追加後に少し待ってから最後の要素を監視
-      setTimeout(updateObserver, 100);
+      updateObserver(); // displayMoreImagesは同期処理なので直後で確実
     }
   });
 }, observerOptions);
@@ -538,8 +538,8 @@ function updateObserver() {
   }
 }
 
-// 初回ロード後に監視開始（loadAllImagesが非同期なのでwaitが必要）
-setTimeout(updateObserver, 300);
+// loadAllImages()はawaitで呼んでいないのでここでは呼ばない
+// （初回ロード完了後にloadAllImages内部でupdateObserverを呼ぶ）
 
 /* ==========================
 Realtime - WebSocket最適化版（ポーリングなし）
