@@ -189,48 +189,44 @@ async function checkUserLike(fileName) {
 }
 
 async function toggleLike(fileName) {
+  // ── 楽観的更新：先にUIを即時反映してからDB書き込み ──
+  const wasLiked = userLikes[fileName] ?? false;
+  const prevCount = likesCache[fileName] || 0;
+
+  // 即座にUI更新
+  userLikes[fileName] = !wasLiked;
+  likesCache[fileName] = wasLiked ? Math.max(0, prevCount - 1) : prevCount + 1;
+  updateLikeButtons(fileName);
+
   try {
-    // キャッシュから判定（DBへの追加クエリ不要）
-    const hasLiked = userLikes[fileName] ?? false;
-    
-    if (hasLiked) {
+    if (wasLiked) {
       const { error } = await supabaseClient
         .from("likes")
         .delete()
         .eq("file_name", fileName)
         .eq("user_id", currentUserId);
-      
-      if (error?.status === 429) {
-        showToast("⚠️ 一時的に混雑しています。少し待ってから再度お試しください");
-        return;
+
+      if (error) {
+        if (error.status === 429) showToast("⚠️ 混雑しています。少し後でお試しください");
+        throw error;
       }
-      
-      userLikes[fileName] = false;
-      likesCache[fileName] = Math.max(0, (likesCache[fileName] || 0) - 1);
     } else {
       const { error } = await supabaseClient
         .from("likes")
-        .insert([
-          {
-            file_name: fileName,
-            user_id: currentUserId
-          }
-        ]);
-      
-      if (error?.status === 429) {
-        showToast("⚠️ 一時的に混雑しています。少し待ってから再度お試しください");
-        return;
+        .insert([{ file_name: fileName, user_id: currentUserId }]);
+
+      if (error) {
+        if (error.status === 429) showToast("⚠️ 混雑しています。少し後でお試しください");
+        throw error;
       }
-      
-      userLikes[fileName] = true;
-      likesCache[fileName] = (likesCache[fileName] || 0) + 1;
     }
-    
-    updateLikeButtons(fileName);
-    
   } catch (error) {
+    // DB書き込み失敗 → ロールバック
     console.error("いいね操作エラー:", error);
-    showToast("❌ エラーが発生しました");
+    userLikes[fileName] = wasLiked;
+    likesCache[fileName] = prevCount;
+    updateLikeButtons(fileName);
+    if (error.status !== 429) showToast("❌ エラーが発生しました");
   }
 }
 
@@ -545,19 +541,39 @@ function updateObserver() {
 Realtime - WebSocket最適化版（ポーリングなし）
 ========================== */
 
+/* ==========================
+Realtime + フォールバックポーリング
+50人同時接続を想定した二重構成
+========================== */
+
 let photosChannel = null;
 let likesChannel = null;
 let isLikesChannelConnected = false;
-let isReconnecting = false; // 再接続中フラグ（多重実行防止）
+let isReconnecting = false;
+let pollIntervalId = null;
+
+// ── ポーリング：表示中の全ファイルのいいね数を定期再取得 ──
+// WebSocketが届かない場合のフォールバック（15秒ごと）
+function startPolling() {
+  if (pollIntervalId) return; // 多重起動防止
+  pollIntervalId = setInterval(async () => {
+    if (displayedCount === 0) return;
+    const visibleNames = allFiles.slice(0, displayedCount).map(f => f.name);
+    await bulkLoadLikes(visibleNames);
+  }, 15000);
+}
+
+function stopPolling() {
+  if (pollIntervalId) {
+    clearInterval(pollIntervalId);
+    pollIntervalId = null;
+  }
+}
 
 function setupRealtimeListeners() {
-  // 再接続中は多重実行しない
   if (isReconnecting) return;
   isReconnecting = true;
-  console.log('Setting up realtime listeners...');
 
-  // 既存チャンネルを破棄（このremoveChannelがCLOSEDを発火させるが、
-  // isReconnecting=trueなので内部のCLOSEDハンドラは無視される）
   if (likesChannel) {
     supabaseClient.removeChannel(likesChannel);
     likesChannel = null;
@@ -568,35 +584,42 @@ function setupRealtimeListeners() {
   }
 
   const ts = Date.now();
-  likesChannel = supabaseClient.channel(`likes-${ts}`);
+
+  // ── likes チャンネル ──
+  // broadcast + postgres_changes の両方を試みる
+  likesChannel = supabaseClient.channel(`likes-${ts}`, {
+    config: { broadcast: { self: false } }
+  });
 
   likesChannel
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'likes'
-      },
+      { event: '*', schema: 'public', table: 'likes' },
       (payload) => {
         const fileName = payload.new?.file_name || payload.old?.file_name;
-        if (fileName) {
-          if (payload.eventType === 'INSERT') {
-            likesCache[fileName] = (likesCache[fileName] || 0) + 1;
-          } else if (payload.eventType === 'DELETE') {
-            likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
-          }
-          updateLikeButtons(fileName);
+        if (!fileName) return;
+
+        if (payload.eventType === 'INSERT') {
+          // 自分自身のINSERTはtoggleLike側で楽観的更新済みなのでスキップ
+          if (payload.new?.user_id === currentUserId) return;
+          likesCache[fileName] = (likesCache[fileName] || 0) + 1;
+        } else if (payload.eventType === 'DELETE') {
+          if (payload.old?.user_id === currentUserId) return;
+          likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
         }
+        updateLikeButtons(fileName);
       }
     )
     .subscribe((status) => {
       console.log('Likes channel status:', status);
+
       if (status === 'SUBSCRIBED') {
         isLikesChannelConnected = true;
-        isReconnecting = false; // 接続成功でフラグ解除
+        isReconnecting = false;
+        // WebSocket成功 → ポーリング間隔を長めに（補完用として残す）
+        stopPolling();
+        startPolling(); // 15秒ポーリングは維持（WebSocketの取りこぼし補完）
       } else if ((status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !isReconnecting) {
-        // isReconnecting=false の時だけ再接続（removeChannelによるCLOSEDは無視）
         isLikesChannelConnected = false;
         isReconnecting = true;
         console.warn('Likes channel lost, reconnecting in 3s...');
@@ -607,22 +630,14 @@ function setupRealtimeListeners() {
       }
     });
 
-  // 新しい写真追加の監視
+  // ── photos チャンネル ──
   photosChannel = supabaseClient.channel(`photos-${ts}`);
-
   photosChannel
     .on(
       'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'storage',
-        table: 'objects'
-      },
+      { event: 'INSERT', schema: 'storage', table: 'objects' },
       (payload) => {
-        console.log('新しい写真が追加されました:', payload);
-        if (payload.new.bucket_id === "photos") {
-          loadAllImages();
-        }
+        if (payload.new.bucket_id === "photos") loadAllImages();
       }
     )
     .subscribe((status) => {
@@ -630,8 +645,9 @@ function setupRealtimeListeners() {
     });
 }
 
-// リアルタイムリスナー開始
+// 起動
 setupRealtimeListeners();
+startPolling(); // 接続確立前からポーリング開始（初期表示直後の他ユーザー操作をカバー）
 
 // 定期的に接続確認（30秒ごと）
 setInterval(() => {
@@ -643,14 +659,16 @@ setInterval(() => {
 
 // ページを離れる時にクリーンアップ
 window.addEventListener('beforeunload', () => {
+  stopPolling();
   if (likesChannel) supabaseClient.removeChannel(likesChannel);
   if (photosChannel) supabaseClient.removeChannel(photosChannel);
 });
 
-// ページを非表示になった時はチャンネル停止、復帰時に再接続
+// ページ非表示時：停止、復帰時：再接続
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    isReconnecting = true; // removeChannelのCLOSEDで再接続ループしないよう先にセット
+    stopPolling();
+    isReconnecting = true;
     if (likesChannel) supabaseClient.removeChannel(likesChannel);
     if (photosChannel) supabaseClient.removeChannel(photosChannel);
     likesChannel = null;
@@ -658,7 +676,15 @@ document.addEventListener('visibilitychange', () => {
     isLikesChannelConnected = false;
     isReconnecting = false;
   } else {
-    setupRealtimeListeners();
+    // 復帰時：まず即座にポーリングで最新状態を取得してからWebSocket再接続
+    (async () => {
+      if (displayedCount > 0) {
+        const visibleNames = allFiles.slice(0, displayedCount).map(f => f.name);
+        await bulkLoadLikes(visibleNames);
+      }
+      setupRealtimeListeners();
+      startPolling();
+    })();
   }
 });
 
