@@ -207,7 +207,7 @@ async function toggleLike(fileName) {
         .eq("user_id", currentUserId);
 
       if (error) {
-        if (error.status === 429) showToast("⚠️ 混雑しています。少し後でお試しください");
+        if (error.status === 429) showToast("混雑しています。少し後でお試しください");
         throw error;
       }
     } else {
@@ -216,7 +216,7 @@ async function toggleLike(fileName) {
         .insert([{ file_name: fileName, user_id: currentUserId }]);
 
       if (error) {
-        if (error.status === 429) showToast("⚠️ 混雑しています。少し後でお試しください");
+        if (error.status === 429) showToast("混雑しています。少し後でお試しください");
         throw error;
       }
     }
@@ -226,7 +226,7 @@ async function toggleLike(fileName) {
     userLikes[fileName] = wasLiked;
     likesCache[fileName] = prevCount;
     updateLikeButtons(fileName);
-    if (error.status !== 429) showToast("❌ エラーが発生しました");
+    if (error.status !== 429) showToast("エラーが発生しました");
   }
 }
 
@@ -282,7 +282,7 @@ downloadBtn.onclick = async (e) => {
           text: "Wedding Album Photo"
         });
         
-        showToast("📸 写真を保存しました！");
+        showToast("写真を保存しました");
         setTimeout(() => {
           viewer.classList.add("hidden");
         }, 1500);
@@ -290,7 +290,7 @@ downloadBtn.onclick = async (e) => {
       } catch (err) {
         if (err.name !== 'AbortError') {
           console.error(err);
-          showToast("❌ 保存に失敗しました");
+          showToast("保存に失敗しました");
         }
       }
       
@@ -298,7 +298,7 @@ downloadBtn.onclick = async (e) => {
       const blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, '_blank');
       
-      showToast("📸 画像を開きました");
+      showToast("画像を開きました");
       setTimeout(() => {
         viewer.classList.add("hidden");
       }, 1500);
@@ -309,7 +309,7 @@ downloadBtn.onclick = async (e) => {
     
   } catch (error) {
     console.error("保存失敗:", error);
-    showToast("❌ 保存に失敗しました");
+    showToast("保存に失敗しました");
     downloadBtn.textContent = "📥 保存";
     downloadBtn.disabled = false;
   }
@@ -819,7 +819,7 @@ confirmUpload.onclick = async () => {
 
     uploadStatus.textContent = "";
     spinner.classList.add("hidden");
-    showToast("❌ アップロード失敗");
+    showToast("アップロードに失敗しました");
 
     isUploading = false;
     confirmUpload.disabled = false;
@@ -831,7 +831,7 @@ confirmUpload.onclick = async () => {
 
   uploadStatus.textContent = "アップロード完了！";
   spinner.classList.add("hidden");
-  showToast("✅ アップロードしました！");
+  showToast("アップロードしました");
 
   setTimeout(() => {
 

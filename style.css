@@ -35,30 +35,64 @@ button {
 ===================== */
 
 .header {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  background: linear-gradient(160deg, #1a3a4a 0%, #0d6a8a 60%, var(--accent) 100%);
   color: white;
-  /* ノッチ・Dynamic Island・ステータスバーの高さ分だけ上にパディングを追加 */
-  padding-top: calc(20px + env(safe-area-inset-top));
-  padding-bottom: 20px;
+  padding-top: calc(24px + env(safe-area-inset-top));
+  padding-bottom: 24px;
   padding-left: 16px;
   padding-right: 16px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.18);
+  position: relative;
+  overflow: hidden;
 }
 
-.header h1 {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+/* 背景の光沢装飾 */
+.header::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -10%;
+  width: 60%;
+  height: 160%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.header-eyebrow {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 3.5px;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.header-title {
+  margin: 0 0 10px 0;
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+/* タイトル下の細いライン */
+.header-title::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.5);
+  margin: 10px auto 0;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 12px;
-  opacity: 0.95;
+  font-size: 11px;
+  opacity: 0.65;
   line-height: 1.5;
-  font-weight: 500;
+  font-weight: 300;
+  letter-spacing: 0.5px;
 }
 
 /* =====================
