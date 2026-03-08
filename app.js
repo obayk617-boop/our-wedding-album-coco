@@ -136,46 +136,62 @@ style.textContent = `
 document.head.appendChild(style);
 
 /* ==========================
-いいね機能 - 最適化版
+いいね機能 - バルク取得版（N+1解消）
 ========================== */
 
-async function getLikesForImage(fileName) {
+// 複数ファイルのいいね数を1回のクエリで取得
+async function bulkLoadLikes(fileNames) {
+  if (!fileNames.length) return;
   try {
-    const { count, error } = await supabaseClient
+    // いいね数を集計（グループ別カウント）
+    const { data: countsData, error: countError } = await supabaseClient
       .from("likes")
-      .select("*", { count: "exact", head: true })
-      .eq("file_name", fileName);
-    
-    if (error) {
-      console.warn(`Like count error for ${fileName}:`, error.message);
-      return likesCache[fileName] || 0;
+      .select("file_name")
+      .in("file_name", fileNames);
+
+    if (!countError && countsData) {
+      // ファイル名ごとにカウント集計
+      const countMap = {};
+      for (const row of countsData) {
+        countMap[row.file_name] = (countMap[row.file_name] || 0) + 1;
+      }
+      for (const name of fileNames) {
+        likesCache[name] = countMap[name] || 0;
+      }
     }
-    
-    return count || 0;
+
+    // 自分のいいねを一括取得
+    const { data: myLikesData, error: myError } = await supabaseClient
+      .from("likes")
+      .select("file_name")
+      .in("file_name", fileNames)
+      .eq("user_id", currentUserId);
+
+    if (!myError && myLikesData) {
+      const mySet = new Set(myLikesData.map(r => r.file_name));
+      for (const name of fileNames) {
+        userLikes[name] = mySet.has(name);
+      }
+    }
+
+    // 取得済みのボタンをまとめて更新
+    for (const name of fileNames) {
+      updateLikeButtons(name);
+    }
   } catch (error) {
-    console.error("いいね数取得エラー:", error);
-    return likesCache[fileName] || 0;
+    console.error("バルクいいね取得エラー:", error);
   }
 }
 
 async function checkUserLike(fileName) {
-  try {
-    const { data } = await supabaseClient
-      .from("likes")
-      .select("id")
-      .eq("file_name", fileName)
-      .eq("user_id", currentUserId);
-    
-    return data && data.length > 0;
-  } catch (error) {
-    console.error("ユーザーいいね確認エラー:", error);
-    return false;
-  }
+  // toggleLike 内で使うため残す（単体確認用）
+  return userLikes[fileName] ?? false;
 }
 
 async function toggleLike(fileName) {
   try {
-    const hasLiked = await checkUserLike(fileName);
+    // キャッシュから判定（DBへの追加クエリ不要）
+    const hasLiked = userLikes[fileName] ?? false;
     
     if (hasLiked) {
       const { error } = await supabaseClient
@@ -340,7 +356,7 @@ async function compressImage(file, maxWidth = 1280, quality = 0.7) {
 }
 
 /* ==========================
-Gallery - 最適化版（新規画像検出）
+Gallery - 差分更新版（全消去しない）
 ========================== */
 
 async function loadAllImages() {
@@ -358,67 +374,112 @@ async function loadAllImages() {
   }
 
   const newFiles = data || [];
-  
-  // 新しい画像があったかチェック
-  const newPhotoCount = newFiles.length;
-  const photosAdded = newPhotoCount - lastCheckedPhotoCount;
-  
-  if (photosAdded > 0) {
-    console.log(`新しい画像が${photosAdded}個追加されました`);
-    lastCheckedPhotoCount = newPhotoCount;
-  }
 
-  allFiles = newFiles;
-  displayedCount = 0;
-  gallery.innerHTML = "";
-  
-  // 最初の画像を読み込む
-  displayMoreImages();
-  
-  // 新しい画像のいいね数を読み込む（バックグラウンド）
+  // ── 初回ロード ──
   if (!isInitialLoadDone) {
     isInitialLoadDone = true;
-    loadLikesData();
-  } else if (photosAdded > 0) {
-    // 新しく追加された画像のみいいね数を取得（最初の5枚のみ）
-    const newPhotos = allFiles.slice(0, Math.min(photosAdded, 5));
-    for (const file of newPhotos) {
-      try {
-        const count = await getLikesForImage(file.name);
-        likesCache[file.name] = count;
-        
-        const isLiked = await checkUserLike(file.name);
-        userLikes[file.name] = isLiked;
-        
-        updateLikeButtons(file.name);
-      } catch (error) {
-        console.error(`Error loading likes for ${file.name}:`, error);
-      }
+    allFiles = newFiles;
+    lastCheckedPhotoCount = newFiles.length;
+    displayedCount = 0;
+    gallery.innerHTML = "";
+
+    displayMoreImages();
+
+    // 表示中の先頭をバルク取得
+    const initialNames = allFiles.slice(0, itemsPerPage).map(f => f.name);
+    await bulkLoadLikes(initialNames);
+    return;
+  }
+
+  // ── 差分検出：新しく追加されたファイルのみ先頭に挿入 ──
+  const existingNames = new Set(allFiles.map(f => f.name));
+  const addedFiles = newFiles.filter(f => !existingNames.has(f.name));
+
+  if (addedFiles.length > 0) {
+    console.log(`新しい画像が ${addedFiles.length} 個追加されました`);
+
+    // allFiles の先頭に追加（降順を維持）
+    allFiles = [...addedFiles, ...allFiles];
+    displayedCount += addedFiles.length;
+    lastCheckedPhotoCount = allFiles.length;
+
+    // 新しいカードを先頭に挿入（gallery.innerHTML は触らない）
+    const fragment = document.createDocumentFragment();
+    for (const file of [...addedFiles].reverse()) {
+      fragment.prepend(createImageCard(file));
     }
+    gallery.prepend(fragment);
+
+    // 新しい写真のいいね数をバルク取得
+    await bulkLoadLikes(addedFiles.map(f => f.name));
   }
 }
 
-// いいねデータを非同期で読み込む（最初の30枚のみ）
-async function loadLikesData() {
-  const filesToLoad = allFiles.slice(0, 30);
-  
-  for (const file of filesToLoad) {
-    try {
-      const count = await getLikesForImage(file.name);
-      likesCache[file.name] = count;
-      
-      const isLiked = await checkUserLike(file.name);
-      userLikes[file.name] = isLiked;
-      
-      updateLikeButtons(file.name);
-    } catch (error) {
-      if (error?.message?.includes('429')) {
-        console.warn('レート制限に達しました');
-        break;
-      }
-      console.error(`Error loading likes for ${file.name}:`, error);
-    }
-  }
+// カード1枚を生成する関数（loadAllImages の差分挿入でも再利用）
+function createImageCard(file) {
+  const { data: urlData } = supabaseClient.storage
+    .from("photos")
+    .getPublicUrl(file.name);
+
+  const container = document.createElement("div");
+  container.style.cssText = `
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+  `;
+
+  const img = document.createElement("img");
+  img.src = urlData.publicUrl;
+  img.loading = "lazy";
+  img.style.cssText = `
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+    cursor: pointer;
+  `;
+
+  img.onclick = () => {
+    viewerImg.src = img.src;
+    currentImageUrl = img.src;
+    currentImageFileName = file.name;
+    viewer.classList.remove("hidden");
+    closeMenu();
+  };
+
+  const likeBtn = document.createElement("button");
+  likeBtn.setAttribute("data-like-btn", file.name);
+  likeBtn.style.cssText = `
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  `;
+
+  const count = likesCache[file.name];
+  const isLiked = userLikes[file.name] || false;
+
+  likeBtn.textContent = isLiked ? `❤️ ${count ?? 0}` : `🤍 ${count ?? 0}`;
+  likeBtn.style.color = isLiked ? "#ff4081" : "#999";
+
+  likeBtn.onclick = async (e) => {
+    e.stopPropagation();
+    likeBtn.style.animation = "heartPulse 0.4s ease";
+    await toggleLike(file.name);
+    setTimeout(() => { likeBtn.style.animation = ""; }, 400);
+  };
+
+  container.appendChild(img);
+  container.appendChild(likeBtn);
+  return container;
 }
 
 function displayMoreImages() {
@@ -429,96 +490,22 @@ function displayMoreImages() {
   isLoading = true;
   
   const endIndex = Math.min(displayedCount + itemsPerPage, allFiles.length);
-  
+  const newlyRendered = [];
+
   for (let i = displayedCount; i < endIndex; i++) {
     const file = allFiles[i];
-    
-    const { data: urlData } = supabaseClient.storage
-      .from("photos")
-      .getPublicUrl(file.name);
-
-    // コンテナ
-    const container = document.createElement("div");
-    container.style.cssText = `
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1;
-    `;
-
-    const img = document.createElement("img");
-    img.src = urlData.publicUrl;
-    img.loading = "lazy";
-    img.style.cssText = `
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 12px;
-      cursor: pointer;
-    `;
-
-    img.onclick = () => {
-      viewerImg.src = img.src;
-      currentImageUrl = img.src;
-      currentImageFileName = file.name;
-      
-      viewer.classList.remove("hidden");
-      closeMenu();
-    };
-
-    // いいねボタン
-    const likeBtn = document.createElement("button");
-    likeBtn.setAttribute("data-like-btn", file.name);
-    likeBtn.style.cssText = `
-      position: absolute;
-      bottom: 8px;
-      right: 8px;
-      background: rgba(255, 255, 255, 0.9);
-      border: none;
-      border-radius: 20px;
-      padding: 6px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      z-index: 10;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    `;
-
-    const count = likesCache[file.name];
-    const isLiked = userLikes[file.name] || false;
-    
-    // いいね数が未取得の場合は "？"を表示
-    if (count === undefined) {
-      likeBtn.textContent = `❓ ?`;
-      likeBtn.style.color = "#999";
-      
-      // 非同期でいいね数を取得
-      getLikesForImage(file.name)
-        .then(cnt => {
-          likesCache[file.name] = cnt;
-          updateLikeButtons(file.name);
-        })
-        .catch(err => console.error(`Error loading likes for ${file.name}:`, err));
-    } else {
-      likeBtn.textContent = isLiked ? `❤️ ${count}` : `🤍 ${count}`;
-      likeBtn.style.color = isLiked ? "#ff4081" : "#999";
-    }
-
-    likeBtn.onclick = async (e) => {
-      e.stopPropagation();
-      likeBtn.style.animation = "heartPulse 0.4s ease";
-      await toggleLike(file.name);
-      setTimeout(() => {
-        likeBtn.style.animation = "";
-      }, 400);
-    };
-
-    container.appendChild(img);
-    container.appendChild(likeBtn);
-    gallery.appendChild(container);
+    gallery.appendChild(createImageCard(file));
+    newlyRendered.push(file.name);
   }
   
   displayedCount = endIndex;
   isLoading = false;
+
+  // スクロールで追加表示された分のいいね数をバルク取得（キャッシュ未取得分のみ）
+  const uncached = newlyRendered.filter(name => likesCache[name] === undefined);
+  if (uncached.length > 0) {
+    bulkLoadLikes(uncached);
+  }
 }
 
 loadAllImages();
@@ -537,6 +524,7 @@ const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting && displayedCount < allFiles.length) {
       displayMoreImages();
+      updateObserver();
     }
   });
 }, observerOptions);
@@ -548,12 +536,6 @@ function updateObserver() {
     observer.observe(lastContainer);
   }
 }
-
-const originalDisplayMoreImages = displayMoreImages;
-displayMoreImages = function() {
-  originalDisplayMoreImages();
-  setTimeout(updateObserver, 100);
-};
 
 updateObserver();
 
@@ -567,9 +549,22 @@ let isLikesChannelConnected = false;
 
 function setupRealtimeListeners() {
   console.log('Setting up realtime listeners...');
-  
-  // ★ いいね更新のWebSocket監視（リクエストカウント対象外）
-  likesChannel = supabaseClient.channel('public:likes');
+
+  // 既存チャンネルを確実に破棄してから再生成（重複サブスク防止）
+  if (likesChannel) {
+    supabaseClient.removeChannel(likesChannel);
+    likesChannel = null;
+  }
+  if (photosChannel) {
+    supabaseClient.removeChannel(photosChannel);
+    photosChannel = null;
+  }
+
+  // チャンネル名にタイムスタンプを付与して毎回ユニークにする
+  // （同名チャンネルが残っているとイベントが届かないバグを防ぐ）
+  const ts = Date.now();
+
+  likesChannel = supabaseClient.channel(`likes-${ts}`);
 
   likesChannel
     .on(
@@ -588,10 +583,9 @@ function setupRealtimeListeners() {
           
           if (event === 'INSERT') {
             likesCache[fileName] = (likesCache[fileName] || 0) + 1;
-            console.log(`いいねが追加: ${fileName} (${likesCache[fileName]})`);
+            // 自分のいいねはtoggleLike側で既に更新済みなので他人分だけ反映
           } else if (event === 'DELETE') {
             likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
-            console.log(`いいねが削除: ${fileName} (${likesCache[fileName]})`);
           }
           
           updateLikeButtons(fileName);
@@ -602,20 +596,15 @@ function setupRealtimeListeners() {
       console.log('Likes channel status:', status);
       if (status === 'SUBSCRIBED') {
         isLikesChannelConnected = true;
-        showToast('✅ リアルタイム接続成功');
-      } else if (status === 'CLOSED') {
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
         isLikesChannelConnected = false;
-        showToast('⚠️ リアルタイム接続切断（自動再接続中）');
-        
-        // 自動再接続
-        setTimeout(() => {
-          setupRealtimeListeners();
-        }, 3000);
+        console.warn('Likes channel closed, reconnecting...');
+        setTimeout(() => setupRealtimeListeners(), 3000);
       }
     });
 
   // 新しい写真追加の監視
-  photosChannel = supabaseClient.channel('public:objects');
+  photosChannel = supabaseClient.channel(`photos-${ts}`);
 
   photosChannel
     .on(
@@ -650,25 +639,20 @@ setInterval(() => {
 
 // ページを離れる時にクリーンアップ
 window.addEventListener('beforeunload', () => {
-  if (likesChannel) {
-    likesChannel.unsubscribe();
-    console.log('Likes channel unsubscribed');
-  }
-  if (photosChannel) {
-    photosChannel.unsubscribe();
-    console.log('Photos channel unsubscribed');
-  }
+  if (likesChannel) supabaseClient.removeChannel(likesChannel);
+  if (photosChannel) supabaseClient.removeChannel(photosChannel);
 });
 
-// ページを非表示になった時はチャンネル削除、復帰時に再接続
+// ページを非表示になった時はチャンネル停止、復帰時に再接続
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    if (likesChannel) likesChannel.unsubscribe();
-    if (photosChannel) photosChannel.unsubscribe();
-    console.log('Page hidden - channels paused');
+    if (likesChannel) supabaseClient.removeChannel(likesChannel);
+    if (photosChannel) supabaseClient.removeChannel(photosChannel);
+    likesChannel = null;
+    photosChannel = null;
+    isLikesChannelConnected = false;
   } else {
     setupRealtimeListeners();
-    console.log('Page visible - channels reconnected');
   }
 });
 
