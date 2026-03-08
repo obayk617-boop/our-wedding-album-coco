@@ -524,7 +524,8 @@ const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting && displayedCount < allFiles.length) {
       displayMoreImages();
-      updateObserver();
+      // DOM追加後に少し待ってから最後の要素を監視
+      setTimeout(updateObserver, 100);
     }
   });
 }, observerOptions);
@@ -537,7 +538,8 @@ function updateObserver() {
   }
 }
 
-updateObserver();
+// 初回ロード後に監視開始（loadAllImagesが非同期なのでwaitが必要）
+setTimeout(updateObserver, 300);
 
 /* ==========================
 Realtime - WebSocket最適化版（ポーリングなし）
@@ -546,11 +548,16 @@ Realtime - WebSocket最適化版（ポーリングなし）
 let photosChannel = null;
 let likesChannel = null;
 let isLikesChannelConnected = false;
+let isReconnecting = false; // 再接続中フラグ（多重実行防止）
 
 function setupRealtimeListeners() {
+  // 再接続中は多重実行しない
+  if (isReconnecting) return;
+  isReconnecting = true;
   console.log('Setting up realtime listeners...');
 
-  // 既存チャンネルを確実に破棄してから再生成（重複サブスク防止）
+  // 既存チャンネルを破棄（このremoveChannelがCLOSEDを発火させるが、
+  // isReconnecting=trueなので内部のCLOSEDハンドラは無視される）
   if (likesChannel) {
     supabaseClient.removeChannel(likesChannel);
     likesChannel = null;
@@ -560,10 +567,7 @@ function setupRealtimeListeners() {
     photosChannel = null;
   }
 
-  // チャンネル名にタイムスタンプを付与して毎回ユニークにする
-  // （同名チャンネルが残っているとイベントが届かないバグを防ぐ）
   const ts = Date.now();
-
   likesChannel = supabaseClient.channel(`likes-${ts}`);
 
   likesChannel
@@ -575,19 +579,13 @@ function setupRealtimeListeners() {
         table: 'likes'
       },
       (payload) => {
-        console.log('いいね更新受信:', payload);
         const fileName = payload.new?.file_name || payload.old?.file_name;
-        
         if (fileName) {
-          const event = payload.eventType;
-          
-          if (event === 'INSERT') {
+          if (payload.eventType === 'INSERT') {
             likesCache[fileName] = (likesCache[fileName] || 0) + 1;
-            // 自分のいいねはtoggleLike側で既に更新済みなので他人分だけ反映
-          } else if (event === 'DELETE') {
+          } else if (payload.eventType === 'DELETE') {
             likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
           }
-          
           updateLikeButtons(fileName);
         }
       }
@@ -596,10 +594,16 @@ function setupRealtimeListeners() {
       console.log('Likes channel status:', status);
       if (status === 'SUBSCRIBED') {
         isLikesChannelConnected = true;
-      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        isReconnecting = false; // 接続成功でフラグ解除
+      } else if ((status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !isReconnecting) {
+        // isReconnecting=false の時だけ再接続（removeChannelによるCLOSEDは無視）
         isLikesChannelConnected = false;
-        console.warn('Likes channel closed, reconnecting...');
-        setTimeout(() => setupRealtimeListeners(), 3000);
+        isReconnecting = true;
+        console.warn('Likes channel lost, reconnecting in 3s...');
+        setTimeout(() => {
+          isReconnecting = false;
+          setupRealtimeListeners();
+        }, 3000);
       }
     });
 
@@ -631,7 +635,7 @@ setupRealtimeListeners();
 
 // 定期的に接続確認（30秒ごと）
 setInterval(() => {
-  if (!isLikesChannelConnected) {
+  if (!isLikesChannelConnected && !isReconnecting) {
     console.warn('WebSocket接続が失われています。再接続します...');
     setupRealtimeListeners();
   }
@@ -646,11 +650,13 @@ window.addEventListener('beforeunload', () => {
 // ページを非表示になった時はチャンネル停止、復帰時に再接続
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    isReconnecting = true; // removeChannelのCLOSEDで再接続ループしないよう先にセット
     if (likesChannel) supabaseClient.removeChannel(likesChannel);
     if (photosChannel) supabaseClient.removeChannel(photosChannel);
     likesChannel = null;
     photosChannel = null;
     isLikesChannelConnected = false;
+    isReconnecting = false;
   } else {
     setupRealtimeListeners();
   }
