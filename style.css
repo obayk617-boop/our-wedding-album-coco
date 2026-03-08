@@ -102,9 +102,8 @@ button {
 .gallery-container {
   padding: 16px 8px;
   margin-bottom: 80px;
-  background-image: url('mermaid_bg.png');
-  background-repeat: repeat;
-  background-size: 500px auto;
+  background: linear-gradient(180deg, #e8f8fc 0%, #f0fbff 40%, #e4f5fa 100%);
+  min-height: 100vh;
 }
 
 .gallery {
