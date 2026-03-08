@@ -355,7 +355,21 @@ async function compressImage(file, maxWidth = 1280, quality = 0.7) {
 Gallery - 差分更新版（全消去しない）
 ========================== */
 
-async function loadAllImages() {
+// デバウンス：短時間に複数回呼ばれても最後の1回だけ実行
+// 50人が同時にアップロードしてRealtimeイベントが連鎖しても
+// 2秒以内の呼び出しは1回にまとめる
+let loadAllImagesTimer = null;
+function loadAllImages() {
+  // 初回は即時実行（ページ表示を遅らせない）
+  if (!isInitialLoadDone) {
+    _loadAllImages();
+    return;
+  }
+  if (loadAllImagesTimer) clearTimeout(loadAllImagesTimer);
+  loadAllImagesTimer = setTimeout(_loadAllImages, 2000);
+}
+
+async function _loadAllImages() {
 
   const { data, error } = await supabaseClient.storage
     .from("photos")
@@ -536,10 +550,6 @@ function updateObserver() {
 
 // loadAllImages()はawaitで呼んでいないのでここでは呼ばない
 // （初回ロード完了後にloadAllImages内部でupdateObserverを呼ぶ）
-
-/* ==========================
-Realtime - WebSocket最適化版（ポーリングなし）
-========================== */
 
 /* ==========================
 Realtime + フォールバックポーリング
@@ -746,6 +756,11 @@ function handleFile(e) {
 
   if (!selectedFile) return;
 
+  // 古いblob URLがあれば解放
+  if (previewImage.src.startsWith("blob:")) {
+    URL.revokeObjectURL(previewImage.src);
+  }
+
   previewImage.src = URL.createObjectURL(selectedFile);
 
   previewModal.classList.remove("hidden");
@@ -757,19 +772,32 @@ function handleFile(e) {
 ========================== */
 
 cancelUpload.onclick = () => {
-
   previewModal.classList.add("hidden");
 
+  // blob URL を解放（メモリリーク防止）
+  if (previewImage.src.startsWith("blob:")) {
+    URL.revokeObjectURL(previewImage.src);
+    previewImage.src = "";
+  }
+
+  // input をリセット（同じ写真を再選択できるように）
+  cameraInput.value = "";
+  fileSelectInput.value = "";
+  selectedFile = null;
 };
 
 /* ==========================
 アップロード
 ========================== */
 
+let isUploading = false; // 二重アップロード防止フラグ
+
 confirmUpload.onclick = async () => {
 
   if (!selectedFile) return;
+  if (isUploading) return; // 二重送信を完全ブロック
 
+  isUploading = true;
   confirmUpload.disabled = true;
   cancelUpload.disabled = true;
 
@@ -791,8 +819,10 @@ confirmUpload.onclick = async () => {
   if (error) {
 
     uploadStatus.textContent = "";
+    spinner.classList.add("hidden");
     showToast("❌ アップロード失敗");
 
+    isUploading = false;
     confirmUpload.disabled = false;
     cancelUpload.disabled = false;
 
@@ -802,21 +832,31 @@ confirmUpload.onclick = async () => {
 
   uploadStatus.textContent = "アップロード完了！";
   spinner.classList.add("hidden");
-
   showToast("✅ アップロードしました！");
 
   setTimeout(() => {
 
     previewModal.classList.add("hidden");
 
+    // input をリセット（同じ写真を再選択できるように）
+    cameraInput.value = "";
+    fileSelectInput.value = "";
+    selectedFile = null;
+
+    isUploading = false;
     confirmUpload.disabled = false;
     cancelUpload.disabled = false;
-
     uploadStatus.textContent = "";
 
   }, 800);
 
-  loadAllImages();
+  // Realtimeのphotosチャンネルが loadAllImages() を呼ぶので
+  // ここでは呼ばない（二重処理防止）
+  // ただしRealtimeが届かない環境のためフォールバックとして遅延実行
+  setTimeout(() => {
+    // Realtimeで既に追加済みなら差分なしでスキップされる
+    loadAllImages();
+  }, 3000);
 
 };
 
