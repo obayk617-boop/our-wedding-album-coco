@@ -103,6 +103,25 @@ button {
   letter-spacing: 0.5px;
 }
 
+.header-message {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+  line-height: 1.8;
+  font-weight: 300;
+  opacity: 0.85;
+  letter-spacing: 0.3px;
+}
+
+.header-message p {
+  margin: 0 0 4px 0;
+}
+
+.header-message p:last-child {
+  margin: 0;
+}
+
 /* =====================
 ギャラリー
 ===================== */
