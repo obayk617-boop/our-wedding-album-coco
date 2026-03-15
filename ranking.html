@@ -214,7 +214,7 @@ html, body {
   font-size: 11px;
   letter-spacing: 3px;
   text-transform: uppercase;
-  opacity: 0.6;
+  opacity: 0.85;
   margin-bottom: 8px;
   padding-left: 4px;
 }
@@ -302,8 +302,16 @@ html, body {
 .rank-block.rank-1 .rank-badge { background: var(--gold);   color: #7a5c00; }
 .rank-block.rank-2 .rank-badge { background: var(--silver); color: #37474f; }
 .rank-block.rank-3 .rank-badge { background: var(--bronze); color: #5d3600; }
-.rank-block.rank-4 .rank-badge { background: rgba(255,255,255,0.2); color: white; }
-.rank-block.rank-5 .rank-badge { background: rgba(255,255,255,0.2); color: white; }
+.rank-block.rank-4 .rank-card {
+  border-color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.12);
+}
+.rank-block.rank-5 .rank-card {
+  border-color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.12);
+}
+.rank-block.rank-4 .rank-badge { background: rgba(255,255,255,0.35); color: white; font-weight: 700; }
+.rank-block.rank-5 .rank-badge { background: rgba(255,255,255,0.35); color: white; font-weight: 700; }
 
 /* =====================
 自分が1位の演出
@@ -397,6 +405,88 @@ html, body {
   font-size: 14px;
   line-height: 2;
 }
+
+/* =====================
+戻るボタン
+===================== */
+
+.back-btn {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 16px;
+  z-index: 50;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.back-btn:active {
+  background: rgba(255,255,255,0.25);
+  transform: scale(0.96);
+}
+
+/* =====================
+ダウンロードボタン
+===================== */
+
+.rank-card-dl {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  padding: 8px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.rank-card-dl:active {
+  background: rgba(255,255,255,0.22);
+  transform: scale(0.97);
+}
+
+/* 一括DLボタン */
+.bulk-dl-btn {
+  display: block;
+  margin: 20px 16px 0;
+  width: calc(100% - 32px);
+  padding: 14px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: white;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.bulk-dl-btn:active {
+  background: rgba(255,255,255,0.22);
+  transform: scale(0.98);
+}
 </style>
 </head>
 
@@ -421,12 +511,16 @@ html, body {
   <div id="countdownNumber" class="countdown-number">5</div>
 </div>
 
+<!-- 戻るボタン（ランキング表示時のみ表示） -->
+<button id="backBtn" class="back-btn" style="display:none" onclick="window.location.href='index.html'">← アルバムへ</button>
+
 <!-- ランキング -->
 <div id="rankingScreen">
   <div class="ranking-header">
     <p class="ranking-eyebrow">Best Shot Award</p>
     <h1 class="ranking-title">Ranking</h1>
   </div>
+  <button id="bulkDlBtn" class="bulk-dl-btn" style="display:none">表示中の写真を一括保存</button>
   <div id="rankList" class="rank-list"></div>
 </div>
 
@@ -526,9 +620,13 @@ async function buildRanking() {
 ランキング画面を描画
 ========================== */
 
+// 表示中の全写真URLを保持（一括DL用）
+let renderedPhotoUrls = [];
+
 async function renderRanking() {
   const rankList = document.getElementById("rankList");
   rankList.innerHTML = "";
+  renderedPhotoUrls = [];
 
   const ranked = await buildRanking();
 
@@ -554,6 +652,8 @@ async function renderRanking() {
     cards.className = "rank-cards";
 
     for (const item of group.items) {
+      renderedPhotoUrls.push(item.url);
+
       const card = document.createElement("div");
       card.className = "rank-card";
 
@@ -580,9 +680,16 @@ async function renderRanking() {
       info.appendChild(seatLabel);
       info.appendChild(countLabel);
 
+      // ③ 個別ダウンロードボタン
+      const dlBtn = document.createElement("button");
+      dlBtn.className = "rank-card-dl";
+      dlBtn.textContent = "この写真を保存";
+      dlBtn.onclick = () => downloadPhoto(item.url, `ranking-${index + 1}.jpg`);
+
       card.appendChild(badge);
       card.appendChild(img);
       card.appendChild(info);
+      card.appendChild(dlBtn);
       cards.appendChild(card);
     }
 
@@ -590,25 +697,66 @@ async function renderRanking() {
     rankList.appendChild(block);
   });
 
+  // ① 戻るボタン・③ 一括DLボタンを表示
+  document.getElementById("backBtn").style.display = "";
+  const bulkBtn = document.getElementById("bulkDlBtn");
+  bulkBtn.style.display = "";
+  bulkBtn.onclick = () => bulkDownload();
+
   // 5位→1位の順でスライドイン（下から上へ）
   const blocks = Array.from(rankList.querySelectorAll(".rank-block")).reverse();
   blocks.forEach((block, idx) => {
-    setTimeout(() => {
-      block.classList.add("visible");
-    }, idx * 400);
+    setTimeout(() => block.classList.add("visible"), idx * 400);
   });
 
   // 自分が1位グループにいるか確認
   const firstGroup = ranked[0];
-  if (firstGroup && firstGroup.rank === 1) {
+  if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
       const totalDelay = blocks.length * 400 + 600;
-      setTimeout(() => {
-        showWinnerBanner();
-      }, totalDelay);
+      setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
+}
+
+/* ==========================
+③ ダウンロード処理
+========================== */
+
+async function downloadPhoto(url, fileName) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const file = new File([blob], fileName, { type: "image/jpeg" });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "Wedding Photo" });
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") console.error("DL失敗:", err);
+  }
+}
+
+async function bulkDownload() {
+  const btn = document.getElementById("bulkDlBtn");
+  btn.disabled = true;
+  btn.textContent = "保存中…";
+
+  for (let i = 0; i < renderedPhotoUrls.length; i++) {
+    await downloadPhoto(renderedPhotoUrls[i], `wedding-ranking-${i + 1}.jpg`);
+    // iOSのShare APIは連続呼び出しを嫌うので少し間隔を空ける
+    await new Promise(r => setTimeout(r, 800));
+  }
+
+  btn.disabled = false;
+  btn.textContent = "表示中の写真を一括保存";
 }
 
 /* ==========================
@@ -707,6 +855,16 @@ if (!alreadyRevealed) {
       }
     )
     .subscribe();
+}
+
+// ② 発表済みの場合、30秒ごとにランキングを再描画（いいね変動に追従）
+if (alreadyRevealed) {
+  setInterval(async () => {
+    const rankingScreen = document.getElementById("rankingScreen");
+    if (rankingScreen.style.display !== "none" && rankingScreen.style.display !== "") {
+      await renderRanking();
+    }
+  }, 30000);
 }
 
 </script>

@@ -387,10 +387,25 @@ function updateObserver() {
 }
 
 /* ==========================
-Realtime - photosのみ（いいねRTは削除）
+Realtime + ポーリング（新着写真の反映）
+Supabase StorageのRealtimeは届かない環境があるため
+ポーリングをメインにしてRealtimeをサブとして使う
 ========================== */
 
 let photosChannel = null;
+let photosPollTimer = null;
+
+function startPhotosPolling() {
+  if (photosPollTimer) return;
+  // 10秒ごとに新着確認
+  photosPollTimer = setInterval(() => {
+    loadAllImages();
+  }, 10000);
+}
+
+function stopPhotosPolling() {
+  if (photosPollTimer) { clearInterval(photosPollTimer); photosPollTimer = null; }
+}
 
 function setupRealtimeListeners() {
   if (photosChannel) { supabaseClient.removeChannel(photosChannel); photosChannel = null; }
@@ -404,17 +419,23 @@ function setupRealtimeListeners() {
 }
 
 setupRealtimeListeners();
+startPhotosPolling();
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    stopPhotosPolling();
     if (photosChannel) supabaseClient.removeChannel(photosChannel);
     photosChannel = null;
   } else {
+    // 復帰時：即座に新着確認してから再接続
+    loadAllImages();
     setupRealtimeListeners();
+    startPhotosPolling();
   }
 });
 
 window.addEventListener("beforeunload", () => {
+  stopPhotosPolling();
   if (photosChannel) supabaseClient.removeChannel(photosChannel);
 });
 
@@ -435,20 +456,28 @@ document.addEventListener("click", (e) => {
 });
 
 /* ==========================
-隠しボタン：ヘッダータイトルを5回タップでranking.htmlへ
+隠しボタン：席番号バッジを5回タップでranking.htmlへ
 ========================== */
 
-let titleTapCount = 0;
-let titleTapTimer = null;
+let seatTapCount = 0;
+let seatTapTimer = null;
 
-const headerTitle = document.querySelector(".header-title");
-if (headerTitle) {
-  headerTitle.addEventListener("click", () => {
-    titleTapCount++;
-    if (titleTapTimer) clearTimeout(titleTapTimer);
-    titleTapTimer = setTimeout(() => { titleTapCount = 0; }, 2000);
-    if (titleTapCount >= 5) {
-      titleTapCount = 0;
+const seatBadgeEl = document.getElementById("seatBadge");
+if (seatBadgeEl) {
+  // ボタンっぽいスタイルをJSで付与
+  seatBadgeEl.style.cursor = "pointer";
+  seatBadgeEl.style.webkitUserSelect = "none";
+  seatBadgeEl.style.userSelect = "none";
+
+  seatBadgeEl.addEventListener("click", () => {
+    seatTapCount++;
+    if (seatTapTimer) clearTimeout(seatTapTimer);
+    // 軽くフラッシュして「反応してる」感を出す
+    seatBadgeEl.style.opacity = "0.5";
+    setTimeout(() => { seatBadgeEl.style.opacity = ""; }, 100);
+    seatTapTimer = setTimeout(() => { seatTapCount = 0; }, 2000);
+    if (seatTapCount >= 5) {
+      seatTapCount = 0;
       window.location.href = "ranking.html";
     }
   });
