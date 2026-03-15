@@ -227,53 +227,7 @@ button {
   box-shadow: 0 2px 8px var(--accent-shadow);
 }
 
-/* =====================
-メニュー
-===================== */
 
-.menu {
-  position: fixed;
-  bottom: 90px;
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 40;
-  transform: scale(0.8) translateY(10px);
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.2s ease;
-}
-
-.menu.show {
-  transform: scale(1) translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.menu.hidden {
-  display: none;
-}
-
-.menu-btn {
-  padding: 12px 16px;
-  border: none;
-  border-radius: 12px;
-  background: white;
-  color: #333;
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.menu-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
 
 /* =====================
 画像ビューア
@@ -508,7 +462,6 @@ button {
 
 @media (hover: none) and (pointer: coarse) {
   .gallery img:hover { transform: none; }
-  .menu-btn:hover    { background: #f5f5f5; }
   .btn:hover         { transform: none; }
 }
 

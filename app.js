@@ -57,10 +57,6 @@ const closeViewer   = document.getElementById("closeViewer");
 const uploadStatus  = document.getElementById("uploadStatus");
 const spinner       = document.getElementById("spinner");
 const fab           = document.getElementById("fab");
-const menu          = document.getElementById("menu");
-const cameraBtn     = document.getElementById("cameraBtn");
-const fileBtn       = document.getElementById("fileBtn");
-const cameraInput   = document.getElementById("cameraInput");
 const fileSelectInput = document.getElementById("fileSelectInput");
 const previewModal  = document.getElementById("previewModal");
 const previewImage  = document.getElementById("previewImage");
@@ -70,7 +66,6 @@ const cancelUpload  = document.getElementById("cancelUpload");
 let selectedFile = null;
 let currentImageUrl = null;
 let currentImageFileName = null;
-let menuOpen = false;
 
 /* ==========================
 無限スクロール用変数
@@ -182,7 +177,9 @@ function updateLikeButtons(fileName) {
   if (btn) {
     const isLiked = userLikes[fileName] || false;
     btn.textContent = isLiked ? "❤️" : "🤍";
-    btn.style.color  = isLiked ? "#ff4081" : "#999";
+    btn.style.background = isLiked ? "rgba(255,64,129,0.18)" : "rgba(255,255,255,0.18)";
+    btn.style.border     = `1px solid ${isLiked ? "rgba(255,64,129,0.45)" : "rgba(255,255,255,0.35)"}`;
+    btn.style.color      = isLiked ? "#ff4081" : "rgba(255,255,255,0.85)";
   }
 }
 
@@ -321,21 +318,25 @@ function createImageCard(file) {
     currentImageUrl = img.src;
     currentImageFileName = file.name;
     viewer.classList.remove("hidden");
-    closeMenu();
   };
 
   const likeBtn = document.createElement("button");
   likeBtn.setAttribute("data-like-btn", file.name);
-  likeBtn.style.cssText = `
-    position: absolute; bottom: 8px; right: 8px;
-    background: rgba(255,255,255,0.9); border: none; border-radius: 20px;
-    padding: 6px 10px; font-size: 16px; cursor: pointer;
-    z-index: 10; transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  `;
   const isLiked = userLikes[file.name] || false;
   likeBtn.textContent = isLiked ? "❤️" : "🤍";
-  likeBtn.style.color  = isLiked ? "#ff4081" : "#999";
+  likeBtn.style.cssText = `
+    position: absolute; bottom: 8px; right: 8px;
+    background: ${isLiked ? "rgba(255,64,129,0.18)" : "rgba(255,255,255,0.18)"};
+    border: 1px solid ${isLiked ? "rgba(255,64,129,0.45)" : "rgba(255,255,255,0.35)"};
+    border-radius: 20px;
+    padding: 6px 10px; font-size: 16px; cursor: pointer;
+    color: ${isLiked ? "#ff4081" : "rgba(255,255,255,0.85)"};
+    z-index: 10; transition: all 0.2s ease;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    touch-action: manipulation;
+  `;
   likeBtn.onclick = async (e) => {
     e.stopPropagation();
     likeBtn.style.animation = "heartPulse 0.4s ease";
@@ -440,20 +441,13 @@ window.addEventListener("beforeunload", () => {
 });
 
 /* ==========================
-メニュー開閉
+FAB：タップで直接ピッカーを開く
 ========================== */
 
-function openMenu()   { menuOpen = true;  menu.classList.remove("hidden"); menu.classList.add("show"); }
-function closeMenu()  { menuOpen = false; menu.classList.remove("show");   menu.classList.add("hidden"); }
-function toggleMenu() { if (menuOpen) closeMenu(); else openMenu(); }
-
-fab.onclick = (e) => { e.stopPropagation(); toggleMenu(); };
-cameraBtn.onclick = () => { cameraInput.click(); closeMenu(); };
-fileBtn.onclick   = () => { fileSelectInput.click(); closeMenu(); };
-
-document.addEventListener("click", (e) => {
-  if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) closeMenu();
-});
+fab.onclick = (e) => {
+  e.stopPropagation();
+  fileSelectInput.click();
+};
 
 /* ==========================
 隠しボタン：席番号バッジを5回タップでranking.htmlへ
@@ -487,7 +481,6 @@ if (seatBadgeEl) {
 ファイル選択
 ========================== */
 
-cameraInput.onchange = handleFile;
 fileSelectInput.onchange = handleFile;
 
 function handleFile(e) {
@@ -505,7 +498,6 @@ function handleFile(e) {
 cancelUpload.onclick = () => {
   previewModal.classList.add("hidden");
   if (previewImage.src.startsWith("blob:")) { URL.revokeObjectURL(previewImage.src); previewImage.src = ""; }
-  cameraInput.value = "";
   fileSelectInput.value = "";
   selectedFile = null;
 };
@@ -552,7 +544,6 @@ confirmUpload.onclick = async () => {
 
   setTimeout(() => {
     previewModal.classList.add("hidden");
-    cameraInput.value = "";
     fileSelectInput.value = "";
     selectedFile = null;
     isUploading = false;
@@ -569,6 +560,5 @@ confirmUpload.onclick = async () => {
 初期状態
 ========================== */
 
-menu.classList.add("hidden");
 previewModal.classList.add("hidden");
 viewer.classList.add("hidden");
