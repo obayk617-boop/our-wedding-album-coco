@@ -432,9 +432,9 @@ html, body {
 
 <!-- 自分が1位のバナー -->
 <div id="winnerBanner">
-  <div class="winner-emoji">🏆</div>
-  <p class="winner-title">あなたが1位です！</p>
-  <p class="winner-sub">おめでとうございます🎉<br>景品をお受け取りください</p>
+  <div class="winner-emoji">👑</div>
+  <p class="winner-title">Best Shot !</p>
+  <p class="winner-sub">素敵な一枚をありがとうございます<br>みんなの心をつかんだ一枚です<br>最高の思い出をありがとうございます</p>
   <button class="winner-close" onclick="document.getElementById('winnerBanner').classList.remove('show')">ランキングを見る</button>
 </div>
 
@@ -488,29 +488,25 @@ async function buildRanking() {
     }
   }
 
-  // seat番号ごとに最大いいね数の写真を抽出
-  // （同じ人が複数枚アップした場合は最多いいねの1枚を代表とする）
-  const seatBest = {};
-  for (const file of files) {
-    const seatMatch = file.name.match(/_seat(\d+)\./);
-    const seat = seatMatch ? seatMatch[1] : "100";
-    const count = countMap[file.name] || 0;
-
-    if (!seatBest[seat] || count > seatBest[seat].count) {
+  // 写真単位でいいね数を集計・降順ソート
+  // 【定義】いいねが1以上の写真のみ対象。多い順にトップ5順位まで表示。
+  const sorted = files
+    .map(file => {
+      const seatMatch = file.name.match(/_seat(\d+)\./);
+      const seat = seatMatch ? seatMatch[1] : "100";
+      const count = countMap[file.name] || 0;
       const { data: urlData } = supabaseClient.storage.from("photos").getPublicUrl(file.name);
-      seatBest[seat] = { seat, fileName: file.name, count, url: urlData.publicUrl };
-    }
-  }
+      return { seat, fileName: file.name, count, url: urlData.publicUrl };
+    })
+    .filter(item => item.count > 0)   // いいね0は除外
+    .sort((a, b) => b.count - a.count);
 
-  // いいね数で降順ソート
-  const sorted = Object.values(seatBest).sort((a, b) => b.count - a.count);
-
-  // 同率を考慮した順位付け
+  // 同率を考慮した順位付け（5順位まで）
   const ranked = [];
   let rank = 1;
   let i = 0;
 
-  while (i < sorted.length && rank <= 5) {
+  while (i < sorted.length && ranked.length < 5) {
     const currentCount = sorted[i].count;
     const group = [];
 
@@ -520,7 +516,7 @@ async function buildRanking() {
     }
 
     ranked.push({ rank, items: group });
-    rank += group.length; // 同率の分だけ次の順位をスキップ
+    rank += group.length; // 同率n枚の場合、次の順位はn個分スキップ
   }
 
   return ranked;
