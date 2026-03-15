@@ -755,28 +755,31 @@ function canShareFiles(file) {
   return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
 }
 
+// downloadPhoto：保存結果を返す（"saved" | "cancelled" | "fallback"）
 async function downloadPhoto(url, fileName) {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const file = new File([blob], fileName, { type: "image/jpeg" });
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const file = new File([blob], fileName, { type: "image/jpeg" });
 
-    if (canShareFiles(file)) {
-      // Share API対応（iOS・Android対応機種）→ カメラロールへ
+  if (canShareFiles(file)) {
+    try {
       await navigator.share({ files: [file], title: "Wedding Photo" });
-    } else {
-      // 非対応（Android一部・PC）→ ダウンロードフォルダ＋トースト案内
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-      showRankingToast("ダウンロードフォルダに保存されました\nカメラロールへは手動で移動してください\n各写真の保存ボタンからも個別に保存できます");
+      return "saved";
+    } catch (err) {
+      if (err.name === "AbortError") return "cancelled";
+      console.error("Share失敗:", err);
+      return "cancelled";
     }
-  } catch (err) {
-    if (err.name !== "AbortError") console.error("DL失敗:", err);
+  } else {
+    // Share API非対応 → ダウンロードフォルダ
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    return "fallback";
   }
 }
 
@@ -784,15 +787,41 @@ async function bulkDownload() {
   const btn = document.getElementById("bulkDlBtn");
   btn.disabled = true;
 
+  let savedCount = 0;
+  let fallbackCount = 0;
+
   for (let i = 0; i < renderedPhotoUrls.length; i++) {
     btn.textContent = `保存中… ${i + 1} / ${renderedPhotoUrls.length}`;
-    await downloadPhoto(renderedPhotoUrls[i], `wedding-ranking-${i + 1}.jpg`);
-    // Share APIのダイアログが閉じるのを待つ／次のDLとの間隔
-    await new Promise(r => setTimeout(r, 1200));
+
+    const result = await downloadPhoto(renderedPhotoUrls[i], `wedding-ranking-${i + 1}.jpg`);
+
+    if (result === "cancelled") {
+      // キャンセルされたら即中断
+      btn.disabled = false;
+      btn.textContent = "表示中の写真を一括保存";
+      showRankingToast(`キャンセルされました（${savedCount}枚保存済み）`);
+      return;
+    } else if (result === "saved") {
+      savedCount++;
+    } else if (result === "fallback") {
+      fallbackCount++;
+    }
+
+    // Share APIダイアログが完全に閉じるのを待つ（iOS対策）
+    await new Promise(r => setTimeout(r, 1500));
   }
 
   btn.disabled = false;
   btn.textContent = "表示中の写真を一括保存";
+
+  if (fallbackCount > 0) {
+    showRankingToast(
+      `${fallbackCount}枚をダウンロードフォルダに保存しました\nカメラロールへは手動で移動してください\n各写真の保存ボタンからも個別に保存できます`,
+      4000
+    );
+  } else {
+    showRankingToast(`${savedCount}枚の保存が完了しました`);
+  }
 }
 
 /* ==========================
