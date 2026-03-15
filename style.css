@@ -124,6 +124,9 @@ button {
   padding: 4px 14px;
   border-radius: 20px;
   backdrop-filter: blur(4px);
+  touch-action: manipulation; /* ダブルタップズームを抑止 */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* =====================
