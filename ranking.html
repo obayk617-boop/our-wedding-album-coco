@@ -303,15 +303,15 @@ html, body {
 .rank-block.rank-2 .rank-badge { background: var(--silver); color: #37474f; }
 .rank-block.rank-3 .rank-badge { background: var(--bronze); color: #5d3600; }
 .rank-block.rank-4 .rank-card {
-  border-color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.18);
 }
 .rank-block.rank-5 .rank-card {
-  border-color: rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.18);
 }
-.rank-block.rank-4 .rank-badge { background: rgba(255,255,255,0.35); color: white; font-weight: 700; }
-.rank-block.rank-5 .rank-badge { background: rgba(255,255,255,0.35); color: white; font-weight: 700; }
+.rank-block.rank-4 .rank-badge { background: rgba(255,255,255,0.9); color: #333; font-weight: 700; }
+.rank-block.rank-5 .rank-badge { background: rgba(255,255,255,0.9); color: #333; font-weight: 700; }
 
 /* =====================
 自分が1位の演出
@@ -724,20 +724,56 @@ async function renderRanking() {
 ③ ダウンロード処理
 ========================== */
 
+// トースト（ranking画面用）
+function showRankingToast(message, duration = 3000) {
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed; bottom: 50px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30,30,30,0.92); color: white;
+    padding: 12px 20px; border-radius: 25px;
+    font-size: 13px; line-height: 1.6; text-align: center;
+    z-index: 9999; white-space: pre-line;
+    animation: rankToastIn 0.3s ease;
+  `;
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes rankToastIn  { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    @keyframes rankToastOut { from { opacity:1; transform:translateX(-50%) translateY(0); } to { opacity:0; transform:translateX(-50%) translateY(16px); } }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = "rankToastOut 0.3s ease";
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// Share APIが使えるか判定
+function canShareFiles(file) {
+  return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+}
+
 async function downloadPhoto(url, fileName) {
   try {
     const res = await fetch(url);
     const blob = await res.blob();
     const file = new File([blob], fileName, { type: "image/jpeg" });
 
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (canShareFiles(file)) {
+      // Share API対応（iOS・Android対応機種）→ カメラロールへ
       await navigator.share({ files: [file], title: "Wedding Photo" });
     } else {
+      // 非対応（Android一部・PC）→ ダウンロードフォルダ＋トースト案内
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = fileName;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+      showRankingToast("ダウンロードフォルダに保存されました\nカメラロールへは手動で移動してください\n各写真の保存ボタンからも個別に保存できます");
     }
   } catch (err) {
     if (err.name !== "AbortError") console.error("DL失敗:", err);
@@ -747,12 +783,12 @@ async function downloadPhoto(url, fileName) {
 async function bulkDownload() {
   const btn = document.getElementById("bulkDlBtn");
   btn.disabled = true;
-  btn.textContent = "保存中…";
 
   for (let i = 0; i < renderedPhotoUrls.length; i++) {
+    btn.textContent = `保存中… ${i + 1} / ${renderedPhotoUrls.length}`;
     await downloadPhoto(renderedPhotoUrls[i], `wedding-ranking-${i + 1}.jpg`);
-    // iOSのShare APIは連続呼び出しを嫌うので少し間隔を空ける
-    await new Promise(r => setTimeout(r, 800));
+    // Share APIのダイアログが閉じるのを待つ／次のDLとの間隔
+    await new Promise(r => setTimeout(r, 1200));
   }
 
   btn.disabled = false;
@@ -857,15 +893,7 @@ if (!alreadyRevealed) {
     .subscribe();
 }
 
-// ② 発表済みの場合、30秒ごとにランキングを再描画（いいね変動に追従）
-if (alreadyRevealed) {
-  setInterval(async () => {
-    const rankingScreen = document.getElementById("rankingScreen");
-    if (rankingScreen.style.display !== "none" && rankingScreen.style.display !== "") {
-      await renderRanking();
-    }
-  }, 30000);
-}
+// 自動更新なし（発表後はそのまま固定表示）
 
 </script>
 </body>
