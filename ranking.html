@@ -288,13 +288,13 @@ html, body {
   position: absolute;
   top: 8px;
   left: 8px;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
@@ -434,7 +434,7 @@ html, body {
 <div id="winnerBanner">
   <div class="winner-emoji">👑</div>
   <p class="winner-title">Best Shot !</p>
-  <p class="winner-sub">素敵な一枚をありがとうございます<br>みんなの心をつかんだ一枚です<br>最高の思い出をありがとうございます</p>
+  <p class="winner-sub">あなたの一枚が、みんなの心をつかみました<br>素敵な瞬間を残してくれてありがとうございます<br><br>ぜひ新郎新婦から景品をお受け取りください</p>
   <button class="winner-close" onclick="document.getElementById('winnerBanner').classList.remove('show')">ランキングを見る</button>
 </div>
 
@@ -516,7 +516,7 @@ async function buildRanking() {
     }
 
     ranked.push({ rank, items: group });
-    rank += group.length; // 同率n枚の場合、次の順位はn個分スキップ
+    rank += 1; // 同率でも次は必ず+1（1,2,3,4,5固定）
   }
 
   return ranked;
@@ -537,16 +537,17 @@ async function renderRanking() {
     return;
   }
 
-  const rankLabels = ["", "🥇 1位", "🥈 2位", "🥉 3位", "4位", "5位"];
-  const rankClasses = ["", "rank-1", "rank-2", "rank-3", "rank-4", "rank-5"];
+  const rankLabels = ["🥇 1位", "🥈 2位", "🥉 3位", "4位", "5位"];
+  const rankClasses = ["rank-1", "rank-2", "rank-3", "rank-4", "rank-5"];
+  const rankNums = ["1", "2", "3", "4", "5"];
 
-  for (const group of ranked) {
+  ranked.forEach((group, index) => {
     const block = document.createElement("div");
-    block.className = `rank-block ${rankClasses[group.rank] || ""}`;
+    block.className = `rank-block ${rankClasses[index] || ""}`;
 
     const label = document.createElement("div");
     label.className = "rank-label";
-    label.textContent = rankLabels[group.rank] || `${group.rank}位`;
+    label.textContent = rankLabels[index] || `${index + 1}位`;
     block.appendChild(label);
 
     const cards = document.createElement("div");
@@ -558,7 +559,7 @@ async function renderRanking() {
 
       const badge = document.createElement("div");
       badge.className = "rank-badge";
-      badge.textContent = group.rank <= 3 ? ["", "1", "2", "3"][group.rank] : group.rank;
+      badge.textContent = rankNums[index] || (index + 1);
 
       const img = document.createElement("img");
       img.className = "rank-card-photo";
@@ -587,7 +588,7 @@ async function renderRanking() {
 
     block.appendChild(cards);
     rankList.appendChild(block);
-  }
+  });
 
   // 5位→1位の順でスライドイン（下から上へ）
   const blocks = Array.from(rankList.querySelectorAll(".rank-block")).reverse();
