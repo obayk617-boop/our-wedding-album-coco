@@ -449,7 +449,8 @@ html, body {
   width: calc(100% - 24px);
   margin: 0 12px 12px;
   padding: 8px;
-  background: rgba(255,255,255,0.15);
+  /* 下地の色（金色など）が透けないよう暗めの不透明背景を使う */
+  background: rgba(10, 40, 60, 0.55);
   border: 1px solid rgba(255,255,255,0.3);
   color: white;
   border-radius: 10px;
@@ -459,13 +460,14 @@ html, body {
   text-align: center;
   letter-spacing: 0.5px;
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transition: all 0.2s ease;
   -webkit-user-select: none;
   user-select: none;
 }
 
 .rank-card-dl:active {
-  background: rgba(255,255,255,0.25);
+  background: rgba(10, 40, 60, 0.75);
   transform: scale(0.97);
 }
 </style>
