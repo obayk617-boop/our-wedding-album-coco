@@ -6,109 +6,340 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{
-  font-family:sans-serif;
-  text-align:center;
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: linear-gradient(180deg, #5ecfea 0%, #b3ecf8 55%, #c2eef9 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  color: #333;
 }
 
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
-  gap:10px;
+header {
+  background: linear-gradient(160deg, #1a3a4a 0%, #0d6a8a 60%, #29b6d8 100%);
+  color: white;
+  padding: 24px 16px;
+  text-align: center;
 }
 
-.card{
-  position:relative;
+header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
 }
 
-img{
-  width:100%;
-  border-radius:8px;
+header p {
+  margin: 6px 0 0;
+  font-size: 11px;
+  opacity: 0.65;
+  letter-spacing: 1px;
 }
 
-button{
-  position:absolute;
-  bottom:5px;
-  left:5px;
-  background:red;
-  color:white;
-  border:none;
-  padding:5px;
-  border-radius:5px;
+/* 発表ボタンエリア */
+.reveal-section {
+  margin: 24px 16px 0;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  text-align: center;
+}
+
+.reveal-section h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a3a4a;
+}
+
+.reveal-section p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.reveal-status {
+  display: inline-block;
+  margin-bottom: 16px;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.reveal-status.waiting {
+  background: rgba(41,182,216,0.12);
+  color: #0097b8;
+}
+
+.reveal-status.revealed {
+  background: rgba(255,64,129,0.12);
+  color: #e91e63;
+}
+
+.btn-reveal {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #29b6d8 0%, #0097b8 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(41,182,216,0.4);
+  transition: all 0.2s ease;
+  letter-spacing: 1px;
+}
+
+.btn-reveal:active {
+  transform: scale(0.97);
+}
+
+.btn-reveal:disabled {
+  background: #ccc;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-reset {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset:active {
+  transform: scale(0.97);
+  background: #e0e0e0;
+}
+
+/* ギャラリー */
+.gallery-section {
+  margin: 20px 16px 32px;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.gallery-section h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a3a4a;
+  text-align: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 1;
+}
+
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 0;
+  margin: 0;
+}
+
+.card-seat {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0,0,0,0.55);
+  color: white;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+}
+
+.card button {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(220,50,50,0.85);
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
-<h2>🔒 Admin Panel</h2>
+<header>
+  <h1>Admin Panel</h1>
+  <p>🔒 管理者専用</p>
+</header>
 
-<div id="gallery" class="grid"></div>
+<div class="reveal-section">
+  <h2>🏆 ランキング発表</h2>
+  <p>ボタンを押すと全員のランキング画面にカウントダウンが始まります。</p>
+  <div id="revealStatus" class="reveal-status waiting">待機中</div>
+  <button id="revealBtn" class="btn-reveal">発表する 🎉</button>
+  <button id="resetBtn" class="btn-reset">発表を取り消す（リセット）</button>
+</div>
+
+<div class="gallery-section">
+  <h2>📸 写真一覧</h2>
+  <div id="gallery" class="grid"></div>
+</div>
 
 <script type="module">
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-const ADMIN_PASSWORD = "0828"; // ←好きなパスワード
-
+const ADMIN_PASSWORD = "0828";
 const pass = prompt("管理者パスワード");
-
-if(pass !== ADMIN_PASSWORD){
-  document.body.innerHTML="アクセス拒否";
+if (pass !== ADMIN_PASSWORD) {
+  document.body.innerHTML = "<p style='text-align:center;padding:40px;'>アクセス拒否</p>";
   throw new Error("unauthorized");
 }
 
 const supabaseClient = createClient(
-"https://vysdoicwyroygakdrwyt.supabase.co",
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5c2RvaWN3eXJveWdha2Ryd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2NDExMzEsImV4cCI6MjA4NzIxNzEzMX0.uBpCtpMy8pIHTi0bU3GkwcquW-15QcQOr6Pw58TNlAw"
+  "https://vysdoicwyroygakdrwyt.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5c2RvaWN3eXJveWdha2Ryd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2NDExMzEsImV4cCI6MjA4NzIxNzEzMX0.uBpCtpMy8pIHTi0bU3GkwcquW-15QcQOr6Pw58TNlAw"
 );
 
-const gallery=document.getElementById("gallery");
+const gallery      = document.getElementById("gallery");
+const revealBtn    = document.getElementById("revealBtn");
+const resetBtn     = document.getElementById("resetBtn");
+const revealStatus = document.getElementById("revealStatus");
 
-async function loadImages(){
+/* ==========================
+発表フラグ
+========================== */
 
-const {data,error}=await supabaseClient.storage
-.from("photos")
-.list("",{sortBy:{column:"created_at",order:"desc"}});
+async function getRevealStatus() {
+  const { data } = await supabaseClient
+    .from("settings")
+    .select("value")
+    .eq("key", "reveal_ranking")
+    .single();
+  return data?.value === "true";
+}
 
-gallery.innerHTML="";
+async function updateRevealStatus() {
+  const isRevealed = await getRevealStatus();
+  if (isRevealed) {
+    revealStatus.textContent = "発表済み";
+    revealStatus.className = "reveal-status revealed";
+    revealBtn.disabled = true;
+  } else {
+    revealStatus.textContent = "待機中";
+    revealStatus.className = "reveal-status waiting";
+    revealBtn.disabled = false;
+  }
+}
 
-data.forEach(file=>{
+revealBtn.onclick = async () => {
+  if (!confirm("ランキングを発表しますか？\n全員の画面にカウントダウンが始まります。")) return;
 
-const {data:urlData}=supabaseClient.storage
-.from("photos")
-.getPublicUrl(file.name);
+  revealBtn.disabled = true;
+  revealBtn.textContent = "発表中…";
 
-const card=document.createElement("div");
-card.className="card";
+  const { error } = await supabaseClient
+    .from("settings")
+    .upsert({ key: "reveal_ranking", value: "true" });
 
-const img=document.createElement("img");
-img.src=urlData.publicUrl;
-
-const btn=document.createElement("button");
-btn.textContent="削除";
-
-btn.onclick=async()=>{
-if(!confirm("削除しますか？")) return;
-
-await supabaseClient.storage
-.from("photos")
-.remove([file.name]);
-
-loadImages();
+  if (error) {
+    alert("エラーが発生しました: " + error.message);
+    revealBtn.disabled = false;
+    revealBtn.textContent = "発表する 🎉";
+  } else {
+    await updateRevealStatus();
+    revealBtn.textContent = "発表する 🎉";
+  }
 };
 
-card.appendChild(img);
-card.appendChild(btn);
-gallery.appendChild(card);
+resetBtn.onclick = async () => {
+  if (!confirm("発表をリセットしますか？")) return;
 
-});
+  const { error } = await supabaseClient
+    .from("settings")
+    .upsert({ key: "reveal_ranking", value: "false" });
 
+  if (!error) await updateRevealStatus();
+};
+
+updateRevealStatus();
+
+/* ==========================
+写真一覧
+========================== */
+
+async function loadImages() {
+  const { data, error } = await supabaseClient.storage
+    .from("photos")
+    .list("", { sortBy: { column: "created_at", order: "desc" } });
+
+  if (error) { console.error(error); return; }
+
+  gallery.innerHTML = "";
+
+  data.forEach(file => {
+    const { data: urlData } = supabaseClient.storage.from("photos").getPublicUrl(file.name);
+
+    // ファイル名からseat番号を抽出（例: 1234567890_seat12.jpg）
+    const seatMatch = file.name.match(/_seat(\d+)\./);
+    const seatLabel = seatMatch ? `席 ${seatMatch[1]}` : "ゲスト";
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const img = document.createElement("img");
+    img.src = urlData.publicUrl;
+
+    const seatTag = document.createElement("div");
+    seatTag.className = "card-seat";
+    seatTag.textContent = seatLabel;
+
+    const btn = document.createElement("button");
+    btn.textContent = "削除";
+    btn.onclick = async () => {
+      if (!confirm("この写真を削除しますか？")) return;
+      await supabaseClient.storage.from("photos").remove([file.name]);
+      loadImages();
+    };
+
+    card.appendChild(img);
+    card.appendChild(seatTag);
+    card.appendChild(btn);
+    gallery.appendChild(card);
+  });
 }
 
 loadImages();
 
 </script>
-
 </body>
 </html>

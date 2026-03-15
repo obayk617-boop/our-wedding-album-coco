@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Wedding Ranking</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent: #29b6d8;
+  --accent-dark: #0097b8;
+  --gold:   #f5c842;
+  --silver: #b0bec5;
+  --bronze: #cd7f32;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(180deg, #0a2a3a 0%, #0d4a6a 40%, #0d6a8a 70%, #29b6d8 100%);
+  background-attachment: fixed;
+  color: white;
+  overflow-x: hidden;
+}
+
+/* =====================
+波アニメーション（海モチーフ）
+===================== */
+
+.waves {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 80px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.25;
+}
+
+.wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 60px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 60'%3E%3Cpath d='M0 30 Q100 0 200 30 Q300 60 400 30 Q500 0 600 30 Q700 60 800 30 L800 60 L0 60Z' fill='%2329b6d8'/%3E%3C/svg%3E") repeat-x;
+  background-size: 800px 60px;
+  animation: waveMove 6s linear infinite;
+}
+
+.wave:nth-child(2) {
+  bottom: 8px;
+  opacity: 0.5;
+  animation: waveMove 9s linear infinite reverse;
+}
+
+@keyframes waveMove {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* =====================
+待機画面
+===================== */
+
+#waitingScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 24px;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.waiting-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-12px); }
+}
+
+.waiting-title {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.waiting-sub {
+  font-size: 13px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  line-height: 1.8;
+}
+
+/* =====================
+カウントダウン
+===================== */
+
+#countdownScreen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.countdown-label {
+  font-size: 14px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 16px;
+}
+
+.countdown-number {
+  font-size: 120px;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -4px;
+  color: white;
+  text-shadow: 0 0 40px rgba(41,182,216,0.8);
+  animation: countPulse 1s ease-in-out;
+}
+
+@keyframes countPulse {
+  0%   { transform: scale(1.4); opacity: 0.4; }
+  60%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* =====================
+ランキング画面
+===================== */
+
+#rankingScreen {
+  display: none;
+  flex-direction: column;
+  padding: 0 0 100px;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+.ranking-header {
+  text-align: center;
+  padding: calc(32px + env(safe-area-inset-top)) 24px 24px;
+}
+
+.ranking-eyebrow {
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+.ranking-title {
+  font-size: 28px;
+  font-weight: 200;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+}
+
+.ranking-title::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: rgba(255,255,255,0.4);
+  margin: 12px auto 0;
+}
+
+/* ランクカード */
+.rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 16px;
+}
+
+/* 各順位ブロック（同率対応：横並びグリッド） */
+.rank-block {
+  opacity: 0;
+  transform: translateY(60px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.rank-block.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.rank-label {
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+/* 同率が複数いても横に並ぶグリッド */
+.rank-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.rank-card {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  position: relative;
+}
+
+/* 1位は少し大きく */
+.rank-block.rank-1 .rank-card {
+  border-color: rgba(245,200,66,0.5);
+  background: rgba(245,200,66,0.1);
+}
+
+.rank-block.rank-2 .rank-card {
+  border-color: rgba(176,190,197,0.4);
+  background: rgba(176,190,197,0.08);
+}
+
+.rank-block.rank-3 .rank-card {
+  border-color: rgba(205,127,50,0.4);
+  background: rgba(205,127,50,0.08);
+}
+
+.rank-card-photo {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.rank-card-info {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rank-card-seat {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-card-count {
+  font-size: 13px;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+/* 順位バッジ */
+.rank-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.rank-block.rank-1 .rank-badge { background: var(--gold);   color: #7a5c00; }
+.rank-block.rank-2 .rank-badge { background: var(--silver); color: #37474f; }
+.rank-block.rank-3 .rank-badge { background: var(--bronze); color: #5d3600; }
+.rank-block.rank-4 .rank-badge { background: rgba(255,255,255,0.2); color: white; }
+.rank-block.rank-5 .rank-badge { background: rgba(255,255,255,0.2); color: white; }
+
+/* =====================
+自分が1位の演出
+===================== */
+
+#winnerBanner {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 999;
+  background: rgba(0,0,0,0.7);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 40px;
+}
+
+#winnerBanner.show {
+  display: flex;
+}
+
+.winner-emoji {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: winnerBounce 0.6s ease;
+}
+
+@keyframes winnerBounce {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.winner-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--gold);
+  letter-spacing: 2px;
+}
+
+.winner-sub {
+  font-size: 15px;
+  opacity: 0.8;
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+.winner-close {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* =====================
+紙吹雪
+===================== */
+
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  z-index: 1000;
+  animation: confettiFall linear forwards;
+  pointer-events: none;
+}
+
+@keyframes confettiFall {
+  0%   { transform: translateY(-20px) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* =====================
+エラー/空状態
+===================== */
+
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  opacity: 0.5;
+  font-size: 14px;
+  line-height: 2;
+}
+</style>
+</head>
+
+<body>
+
+<!-- 波 -->
+<div class="waves">
+  <div class="wave"></div>
+  <div class="wave"></div>
+</div>
+
+<!-- 待機画面 -->
+<div id="waitingScreen">
+  <div class="waiting-icon">🌊</div>
+  <p class="waiting-title">Ranking</p>
+  <p class="waiting-sub">もうすぐ発表されます<br>このまましばらくお待ちください</p>
+</div>
+
+<!-- カウントダウン -->
+<div id="countdownScreen">
+  <p class="countdown-label">Ranking Reveal</p>
+  <div id="countdownNumber" class="countdown-number">5</div>
+</div>
+
+<!-- ランキング -->
+<div id="rankingScreen">
+  <div class="ranking-header">
+    <p class="ranking-eyebrow">Best Shot Award</p>
+    <h1 class="ranking-title">Ranking</h1>
+  </div>
+  <div id="rankList" class="rank-list"></div>
+</div>
+
+<!-- 自分が1位のバナー -->
+<div id="winnerBanner">
+  <div class="winner-emoji">🏆</div>
+  <p class="winner-title">あなたが1位です！</p>
+  <p class="winner-sub">おめでとうございます🎉<br>景品をお受け取りください</p>
+  <button class="winner-close" onclick="document.getElementById('winnerBanner').classList.remove('show')">ランキングを見る</button>
+</div>
+
+<script type="module">
+
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+const supabaseClient = createClient(
+  "https://vysdoicwyroygakdrwyt.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5c2RvaWN3eXJveWdha2Ryd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2NDExMzEsImV4cCI6MjA4NzIxNzEzMX0.uBpCtpMy8pIHTiO0bU3GkwcquW-15QcQOr6Pw58TNlAw"
+);
+
+/* ==========================
+席番号を取得（自分が1位かどうかの判定用）
+========================== */
+
+function getMySeat() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("seat") || localStorage.getItem("wedding_seat_number") || "100";
+}
+
+const mySeat = getMySeat();
+
+/* ==========================
+いいね数集計＋ランキング構築
+========================== */
+
+async function buildRanking() {
+  // 全写真を取得
+  const { data: files, error: filesError } = await supabaseClient.storage
+    .from("photos")
+    .list("", { sortBy: { column: "created_at", order: "desc" }, limit: 1000 });
+
+  if (filesError || !files || files.length === 0) {
+    return [];
+  }
+
+  const fileNames = files.map(f => f.name);
+
+  // 全いいねを一括取得
+  const { data: likesData, error: likesError } = await supabaseClient
+    .from("likes")
+    .select("file_name")
+    .in("file_name", fileNames);
+
+  // ファイルごとのいいね数を集計
+  const countMap = {};
+  if (!likesError && likesData) {
+    for (const row of likesData) {
+      countMap[row.file_name] = (countMap[row.file_name] || 0) + 1;
+    }
+  }
+
+  // seat番号ごとに最大いいね数の写真を抽出
+  // （同じ人が複数枚アップした場合は最多いいねの1枚を代表とする）
+  const seatBest = {};
+  for (const file of files) {
+    const seatMatch = file.name.match(/_seat(\d+)\./);
+    const seat = seatMatch ? seatMatch[1] : "100";
+    const count = countMap[file.name] || 0;
+
+    if (!seatBest[seat] || count > seatBest[seat].count) {
+      const { data: urlData } = supabaseClient.storage.from("photos").getPublicUrl(file.name);
+      seatBest[seat] = { seat, fileName: file.name, count, url: urlData.publicUrl };
+    }
+  }
+
+  // いいね数で降順ソート
+  const sorted = Object.values(seatBest).sort((a, b) => b.count - a.count);
+
+  // 同率を考慮した順位付け
+  const ranked = [];
+  let rank = 1;
+  let i = 0;
+
+  while (i < sorted.length && rank <= 5) {
+    const currentCount = sorted[i].count;
+    const group = [];
+
+    while (i < sorted.length && sorted[i].count === currentCount) {
+      group.push(sorted[i]);
+      i++;
+    }
+
+    ranked.push({ rank, items: group });
+    rank += group.length; // 同率の分だけ次の順位をスキップ
+  }
+
+  return ranked;
+}
+
+/* ==========================
+ランキング画面を描画
+========================== */
+
+async function renderRanking() {
+  const rankList = document.getElementById("rankList");
+  rankList.innerHTML = "";
+
+  const ranked = await buildRanking();
+
+  if (ranked.length === 0) {
+    rankList.innerHTML = `<div class="empty-state">📷<br>まだ写真がありません</div>`;
+    return;
+  }
+
+  const rankLabels = ["", "🥇 1位", "🥈 2位", "🥉 3位", "4位", "5位"];
+  const rankClasses = ["", "rank-1", "rank-2", "rank-3", "rank-4", "rank-5"];
+
+  for (const group of ranked) {
+    const block = document.createElement("div");
+    block.className = `rank-block ${rankClasses[group.rank] || ""}`;
+
+    const label = document.createElement("div");
+    label.className = "rank-label";
+    label.textContent = rankLabels[group.rank] || `${group.rank}位`;
+    block.appendChild(label);
+
+    const cards = document.createElement("div");
+    cards.className = "rank-cards";
+
+    for (const item of group.items) {
+      const card = document.createElement("div");
+      card.className = "rank-card";
+
+      const badge = document.createElement("div");
+      badge.className = "rank-badge";
+      badge.textContent = group.rank <= 3 ? ["", "1", "2", "3"][group.rank] : group.rank;
+
+      const img = document.createElement("img");
+      img.className = "rank-card-photo";
+      img.src = item.url;
+      img.alt = `席 ${item.seat}`;
+
+      const info = document.createElement("div");
+      info.className = "rank-card-info";
+
+      const seatLabel = document.createElement("span");
+      seatLabel.className = "rank-card-seat";
+      seatLabel.textContent = item.seat === "100" ? "ゲスト" : `席番号 ${item.seat}`;
+
+      const countLabel = document.createElement("span");
+      countLabel.className = "rank-card-count";
+      countLabel.textContent = `❤️ ${item.count}`;
+
+      info.appendChild(seatLabel);
+      info.appendChild(countLabel);
+
+      card.appendChild(badge);
+      card.appendChild(img);
+      card.appendChild(info);
+      cards.appendChild(card);
+    }
+
+    block.appendChild(cards);
+    rankList.appendChild(block);
+  }
+
+  // 5位→1位の順でスライドイン（下から上へ）
+  const blocks = Array.from(rankList.querySelectorAll(".rank-block")).reverse();
+  blocks.forEach((block, idx) => {
+    setTimeout(() => {
+      block.classList.add("visible");
+    }, idx * 400);
+  });
+
+  // 自分が1位グループにいるか確認
+  const firstGroup = ranked[0];
+  if (firstGroup && firstGroup.rank === 1) {
+    const isWinner = firstGroup.items.some(item => item.seat === mySeat);
+    if (isWinner) {
+      const totalDelay = blocks.length * 400 + 600;
+      setTimeout(() => {
+        showWinnerBanner();
+      }, totalDelay);
+    }
+  }
+}
+
+/* ==========================
+紙吹雪
+========================== */
+
+function launchConfetti() {
+  const colors = ["#f5c842", "#29b6d8", "#ff4081", "#ffffff", "#a5f3fc"];
+  for (let i = 0; i < 80; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = Math.random() * 100 + "vw";
+    piece.style.top = "-20px";
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.width  = (Math.random() * 8 + 6) + "px";
+    piece.style.height = (Math.random() * 8 + 6) + "px";
+    piece.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+    piece.style.animationDuration = (Math.random() * 2 + 2) + "s";
+    piece.style.animationDelay    = (Math.random() * 1.5) + "s";
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 5000);
+  }
+}
+
+function showWinnerBanner() {
+  launchConfetti();
+  document.getElementById("winnerBanner").classList.add("show");
+}
+
+/* ==========================
+カウントダウン → ランキング表示
+========================== */
+
+function startCountdown() {
+  const waiting   = document.getElementById("waitingScreen");
+  const countdown = document.getElementById("countdownScreen");
+  const ranking   = document.getElementById("rankingScreen");
+  const numEl     = document.getElementById("countdownNumber");
+
+  waiting.style.display = "none";
+  countdown.style.display = "flex";
+
+  let count = 5;
+  numEl.textContent = count;
+
+  const tick = setInterval(() => {
+    count--;
+    if (count <= 0) {
+      clearInterval(tick);
+      countdown.style.display = "none";
+      ranking.style.display   = "flex";
+      renderRanking();
+    } else {
+      // アニメーションをリセットして再適用
+      numEl.style.animation = "none";
+      void numEl.offsetWidth;
+      numEl.style.animation = "";
+      numEl.textContent = count;
+    }
+  }, 1000);
+}
+
+/* ==========================
+発表フラグを監視
+========================== */
+
+async function checkAndStart() {
+  const { data } = await supabaseClient
+    .from("settings")
+    .select("value")
+    .eq("key", "reveal_ranking")
+    .single();
+
+  if (data?.value === "true") {
+    startCountdown();
+    return true;
+  }
+  return false;
+}
+
+// 起動時にすでに発表済みか確認
+const alreadyRevealed = await checkAndStart();
+
+// 未発表ならリアルタイム監視
+if (!alreadyRevealed) {
+  const channel = supabaseClient
+    .channel("settings-watch")
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "settings", filter: "key=eq.reveal_ranking" },
+      (payload) => {
+        if (payload.new?.value === "true") {
+          channel.unsubscribe();
+          startCountdown();
+        }
+      }
+    )
+    .subscribe();
+}
+
+</script>
+</body>
+</html>

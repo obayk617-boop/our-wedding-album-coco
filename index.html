@@ -4,18 +4,15 @@
   <meta charset="UTF-8" />
   <title>Wedding Album</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  
-  <!-- PWA Meta Tags -->
+
   <meta name="theme-color" content="#29b6d8" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Wedding Album" />
 
-  <!-- PWA manifest & icons -->
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -26,6 +23,12 @@
     <p class="header-eyebrow">Our Special Day</p>
     <h1 class="header-title">Wedding Album</h1>
     <p class="subtitle">写真をタップして保存できます</p>
+
+    <!-- 席番号バッジ -->
+    <div class="seat-badge-wrap">
+      <span id="seatBadge" class="seat-badge"></span>
+    </div>
+
     <div class="header-message">
       <p>ふたりからのお願いです。</p>
       <p>何気ない一枚・面白い一枚、どんな写真も大歓迎。<br>みなさんの目線で見た今日を残してください。</p>
@@ -39,14 +42,11 @@
 
   <!-- 画像拡大ビュー -->
   <div id="viewer" class="viewer hidden">
-
     <button id="closeViewer" class="close-btn">✕</button>
-
     <div class="viewer-content">
       <img id="viewerImg" alt="Wedding Photo">
       <button id="downloadBtn" class="download-btn">保存する</button>
     </div>
-
   </div>
 
   <!-- ＋ボタン -->
@@ -62,17 +62,13 @@
   <div id="previewModal" class="modal hidden">
     <div class="modal-content">
       <h2>写真をアップロード</h2>
-
       <img id="previewImage" alt="Preview">
-
       <p id="uploadStatus" class="status-text"></p>
       <div id="spinner" class="spinner hidden"></div>
-
       <div class="button-group">
         <button id="confirmUpload" class="btn btn-primary">アップロード</button>
         <button id="cancelUpload" class="btn btn-secondary">キャンセル</button>
       </div>
-
     </div>
   </div>
 
@@ -80,8 +76,6 @@
   <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
   <input type="file" id="fileSelectInput" accept="image/*" hidden>
 
-  <!-- JSは最後 -->
   <script type="module" src="app.js"></script>
-
 </body>
 </html>

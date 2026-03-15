@@ -6,42 +6,24 @@ const supabaseClient = createClient(
 );
 
 /* ==========================
-DOM
+席番号管理
 ========================== */
 
-const gallery = document.getElementById("gallery");
+function getSeatNumber() {
+  const params = new URLSearchParams(window.location.search);
+  const seatParam = params.get("seat");
+  if (seatParam) {
+    localStorage.setItem("wedding_seat_number", seatParam);
+    return seatParam;
+  }
+  const saved = localStorage.getItem("wedding_seat_number");
+  if (saved) return saved;
+  localStorage.setItem("wedding_seat_number", "100");
+  return "100";
+}
 
-const viewer = document.getElementById("viewer");
-const viewerImg = document.getElementById("viewerImg");
-const downloadBtn = document.getElementById("downloadBtn");
-const closeViewer = document.getElementById("closeViewer");
-
-const uploadStatus = document.getElementById("uploadStatus");
-const spinner = document.getElementById("spinner");
-
-const fab = document.getElementById("fab");
-const menu = document.getElementById("menu");
-
-const cameraBtn = document.getElementById("cameraBtn");
-const fileBtn = document.getElementById("fileBtn");
-
-const cameraInput = document.getElementById("cameraInput");
-const fileSelectInput = document.getElementById("fileSelectInput");
-
-const previewModal = document.getElementById("previewModal");
-const previewImage = document.getElementById("previewImage");
-
-const confirmUpload = document.getElementById("confirmUpload");
-const cancelUpload = document.getElementById("cancelUpload");
-
-let selectedFile = null;
-let currentImageUrl = null;
-let currentImageFileName = null;
-let menuOpen = false;
-
-/* ==========================
-ユーザーID管理
-========================== */
+const currentSeatNumber = getSeatNumber();
+const isGuest = currentSeatNumber === "100";
 
 function getOrCreateUserId() {
   let userId = localStorage.getItem("wedding_album_user_id");
@@ -55,17 +37,51 @@ function getOrCreateUserId() {
 const currentUserId = getOrCreateUserId();
 
 /* ==========================
-無限スクロール用の変数
+席番号バッジ表示
+========================== */
+
+const seatBadge = document.getElementById("seatBadge");
+if (seatBadge) {
+  seatBadge.textContent = isGuest ? "ゲスト" : `席番号 ${currentSeatNumber}`;
+}
+
+/* ==========================
+DOM
+========================== */
+
+const gallery       = document.getElementById("gallery");
+const viewer        = document.getElementById("viewer");
+const viewerImg     = document.getElementById("viewerImg");
+const downloadBtn   = document.getElementById("downloadBtn");
+const closeViewer   = document.getElementById("closeViewer");
+const uploadStatus  = document.getElementById("uploadStatus");
+const spinner       = document.getElementById("spinner");
+const fab           = document.getElementById("fab");
+const menu          = document.getElementById("menu");
+const cameraBtn     = document.getElementById("cameraBtn");
+const fileBtn       = document.getElementById("fileBtn");
+const cameraInput   = document.getElementById("cameraInput");
+const fileSelectInput = document.getElementById("fileSelectInput");
+const previewModal  = document.getElementById("previewModal");
+const previewImage  = document.getElementById("previewImage");
+const confirmUpload = document.getElementById("confirmUpload");
+const cancelUpload  = document.getElementById("cancelUpload");
+
+let selectedFile = null;
+let currentImageUrl = null;
+let currentImageFileName = null;
+let menuOpen = false;
+
+/* ==========================
+無限スクロール用変数
 ========================== */
 
 let allFiles = [];
 let displayedCount = 0;
 const itemsPerPage = 12;
 let isLoading = false;
-let likesCache = {};
 let userLikes = {};
 let isInitialLoadDone = false;
-let lastCheckedPhotoCount = 0;
 
 /* ==========================
 トースト通知
@@ -87,157 +103,86 @@ function showToast(message, duration = 2000) {
     z-index: 999;
     animation: slideUp 0.3s ease;
   `;
-  
   document.body.appendChild(toast);
-  
   setTimeout(() => {
     toast.style.animation = "slideDown 0.3s ease";
     setTimeout(() => toast.remove(), 300);
   }, duration);
 }
 
-// アニメーション定義
-const style = document.createElement("style");
-style.textContent = `
+const toastStyle = document.createElement("style");
+toastStyle.textContent = `
   @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
-  
   @keyframes slideDown {
-    from {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-    to {
-      opacity: 0;
-      transform: translateX(-50%) translateY(20px);
-    }
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(20px); }
   }
-
   @keyframes heartPulse {
-    0% {
-      transform: scale(1);
-    }
-    25% {
-      transform: scale(1.3);
-    }
-    50% {
-      transform: scale(1);
-    }
+    0%  { transform: scale(1); }
+    25% { transform: scale(1.3); }
+    50% { transform: scale(1); }
   }
 `;
-document.head.appendChild(style);
+document.head.appendChild(toastStyle);
 
 /* ==========================
-いいね機能 - バルク取得版（N+1解消）
+いいね機能（自分の状態のみ・数は非表示）
 ========================== */
 
-// 複数ファイルのいいね数を1回のクエリで取得
 async function bulkLoadLikes(fileNames) {
   if (!fileNames.length) return;
   try {
-    // いいね数を集計（グループ別カウント）
-    const { data: countsData, error: countError } = await supabaseClient
-      .from("likes")
-      .select("file_name")
-      .in("file_name", fileNames);
-
-    if (!countError && countsData) {
-      // ファイル名ごとにカウント集計
-      const countMap = {};
-      for (const row of countsData) {
-        countMap[row.file_name] = (countMap[row.file_name] || 0) + 1;
-      }
-      for (const name of fileNames) {
-        likesCache[name] = countMap[name] || 0;
-      }
-    }
-
-    // 自分のいいねを一括取得
-    const { data: myLikesData, error: myError } = await supabaseClient
+    const { data, error } = await supabaseClient
       .from("likes")
       .select("file_name")
       .in("file_name", fileNames)
       .eq("user_id", currentUserId);
 
-    if (!myError && myLikesData) {
-      const mySet = new Set(myLikesData.map(r => r.file_name));
+    if (!error && data) {
+      const mySet = new Set(data.map(r => r.file_name));
       for (const name of fileNames) {
         userLikes[name] = mySet.has(name);
       }
     }
-
-    // 取得済みのボタンをまとめて更新
-    for (const name of fileNames) {
-      updateLikeButtons(name);
-    }
-  } catch (error) {
-    console.error("バルクいいね取得エラー:", error);
+    for (const name of fileNames) updateLikeButtons(name);
+  } catch (err) {
+    console.error("いいね取得エラー:", err);
   }
 }
 
-async function checkUserLike(fileName) {
-  // toggleLike 内で使うため残す（単体確認用）
-  return userLikes[fileName] ?? false;
-}
-
 async function toggleLike(fileName) {
-  // ── 楽観的更新：先にUIを即時反映してからDB書き込み ──
   const wasLiked = userLikes[fileName] ?? false;
-  const prevCount = likesCache[fileName] || 0;
-
-  // 即座にUI更新
   userLikes[fileName] = !wasLiked;
-  likesCache[fileName] = wasLiked ? Math.max(0, prevCount - 1) : prevCount + 1;
   updateLikeButtons(fileName);
 
   try {
     if (wasLiked) {
       const { error } = await supabaseClient
-        .from("likes")
-        .delete()
-        .eq("file_name", fileName)
-        .eq("user_id", currentUserId);
-
-      if (error) {
-        if (error.status === 429) showToast("混雑しています。少し後でお試しください");
-        throw error;
-      }
+        .from("likes").delete()
+        .eq("file_name", fileName).eq("user_id", currentUserId);
+      if (error) throw error;
     } else {
       const { error } = await supabaseClient
-        .from("likes")
-        .insert([{ file_name: fileName, user_id: currentUserId }]);
-
-      if (error) {
-        if (error.status === 429) showToast("混雑しています。少し後でお試しください");
-        throw error;
-      }
+        .from("likes").insert([{ file_name: fileName, user_id: currentUserId }]);
+      if (error) throw error;
     }
-  } catch (error) {
-    // DB書き込み失敗 → ロールバック
-    console.error("いいね操作エラー:", error);
+  } catch (err) {
+    console.error("いいね操作エラー:", err);
     userLikes[fileName] = wasLiked;
-    likesCache[fileName] = prevCount;
     updateLikeButtons(fileName);
-    if (error.status !== 429) showToast("エラーが発生しました");
+    showToast(err.status === 429 ? "混雑しています。少し後でお試しください" : "エラーが発生しました");
   }
 }
 
 function updateLikeButtons(fileName) {
-  const likeBtn = document.querySelector(`[data-like-btn="${fileName}"]`);
-  if (likeBtn) {
-    const count = likesCache[fileName] || 0;
+  const btn = document.querySelector(`[data-like-btn="${fileName}"]`);
+  if (btn) {
     const isLiked = userLikes[fileName] || false;
-    
-    likeBtn.textContent = isLiked ? `❤️ ${count}` : `🤍 ${count}`;
-    likeBtn.style.color = isLiked ? "#ff4081" : "#999";
+    btn.textContent = isLiked ? "❤️" : "🤍";
+    btn.style.color  = isLiked ? "#ff4081" : "#999";
   }
 }
 
@@ -245,72 +190,51 @@ function updateLikeButtons(fileName) {
 Viewer
 ========================== */
 
-// 背景（暗い余白部分）タップで閉じる
-// viewer-content の pointer-events:none により、
-// 画像・ボタン以外のタップはすべて viewer に届く
 viewer.onclick = (e) => {
-  if (e.target === viewer) {
-    viewer.classList.add("hidden");
-  }
+  if (e.target === viewer) viewer.classList.add("hidden");
 };
 
-closeViewer.onclick = () => {
-  viewer.classList.add("hidden");
-};
+closeViewer.onclick = () => viewer.classList.add("hidden");
 
 downloadBtn.onclick = async (e) => {
   e.preventDefault();
   e.stopPropagation();
-  
   if (!currentImageUrl) return;
-  
+
   try {
     downloadBtn.disabled = true;
     const originalText = downloadBtn.textContent;
     downloadBtn.textContent = "保存中…";
-    
+
     const response = await fetch(currentImageUrl);
     const blob = await response.blob();
-    
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], "photo.jpg", { type: "image/jpeg" })] })) {
-      const file = new File([blob], `wedding-${Date.now()}.jpg`, { type: "image/jpeg" });
-      
+    const downloadFileName = "wedding-photo.jpg"; // 席番号を露出しない固定名
+
+    if (
+      navigator.share &&
+      navigator.canShare &&
+      navigator.canShare({ files: [new File([blob], downloadFileName, { type: "image/jpeg" })] })
+    ) {
+      const file = new File([blob], downloadFileName, { type: "image/jpeg" });
       try {
-        await navigator.share({
-          files: [file],
-          title: "Wedding Photo",
-          text: "Wedding Album Photo"
-        });
-        
+        await navigator.share({ files: [file], title: "Wedding Photo", text: "Wedding Album Photo" });
         showToast("写真を保存しました");
-        setTimeout(() => {
-          viewer.classList.add("hidden");
-        }, 1500);
-        
+        setTimeout(() => viewer.classList.add("hidden"), 1500);
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error(err);
-          showToast("保存に失敗しました");
-        }
+        if (err.name !== "AbortError") showToast("保存に失敗しました");
       }
-      
     } else {
-      const blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank');
-      
+      window.open(URL.createObjectURL(blob), "_blank");
       showToast("画像を開きました");
-      setTimeout(() => {
-        viewer.classList.add("hidden");
-      }, 1500);
+      setTimeout(() => viewer.classList.add("hidden"), 1500);
     }
-    
+
     downloadBtn.textContent = originalText;
     downloadBtn.disabled = false;
-    
-  } catch (error) {
-    console.error("保存失敗:", error);
+  } catch (err) {
+    console.error("保存失敗:", err);
     showToast("保存に失敗しました");
-    downloadBtn.textContent = "📥 保存";
+    downloadBtn.textContent = "保存する";
     downloadBtn.disabled = false;
   }
 };
@@ -320,135 +244,78 @@ downloadBtn.onclick = async (e) => {
 ========================== */
 
 async function compressImage(file, maxWidth = 1280, quality = 0.7) {
-
   const img = new Image();
   const reader = new FileReader();
-
   return new Promise(resolve => {
-
-    reader.onload = e => img.src = e.target.result;
-
+    reader.onload = e => (img.src = e.target.result);
     img.onload = () => {
-
       const scale = Math.min(maxWidth / img.width, 1);
-
       const canvas = document.createElement("canvas");
-
-      canvas.width = img.width * scale;
+      canvas.width  = img.width  * scale;
       canvas.height = img.height * scale;
-
-      const ctx = canvas.getContext("2d");
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => resolve(blob), "image/jpeg", quality);
-
     };
-
     reader.readAsDataURL(file);
-
   });
 }
 
 /* ==========================
-Gallery - 差分更新版（全消去しない）
+Gallery
 ========================== */
 
-// デバウンス：短時間に複数回呼ばれても最後の1回だけ実行
-// 50人が同時にアップロードしてRealtimeイベントが連鎖しても
-// 2秒以内の呼び出しは1回にまとめる
 let loadAllImagesTimer = null;
 function loadAllImages() {
-  // 初回は即時実行（ページ表示を遅らせない）
-  if (!isInitialLoadDone) {
-    _loadAllImages();
-    return;
-  }
+  if (!isInitialLoadDone) { _loadAllImages(); return; }
   if (loadAllImagesTimer) clearTimeout(loadAllImagesTimer);
   loadAllImagesTimer = setTimeout(_loadAllImages, 2000);
 }
 
 async function _loadAllImages() {
-
   const { data, error } = await supabaseClient.storage
     .from("photos")
-    .list("", {
-      sortBy: { column: "created_at", order: "desc" },
-      limit: 1000
-    });
+    .list("", { sortBy: { column: "created_at", order: "desc" }, limit: 1000 });
 
-  if (error) {
-    console.error("画像読み込みエラー:", error);
-    return;
-  }
+  if (error) { console.error("画像読み込みエラー:", error); return; }
 
   const newFiles = data || [];
 
-  // ── 初回ロード ──
   if (!isInitialLoadDone) {
     isInitialLoadDone = true;
     allFiles = newFiles;
-    lastCheckedPhotoCount = newFiles.length;
     displayedCount = 0;
     gallery.innerHTML = "";
-
     displayMoreImages();
-    updateObserver(); // DOM追加直後に確実に監視開始
-
-    // 表示中の先頭をバルク取得
-    const initialNames = allFiles.slice(0, itemsPerPage).map(f => f.name);
-    await bulkLoadLikes(initialNames);
+    updateObserver();
+    await bulkLoadLikes(allFiles.slice(0, itemsPerPage).map(f => f.name));
     return;
   }
 
-  // ── 差分検出：新しく追加されたファイルのみ先頭に挿入 ──
   const existingNames = new Set(allFiles.map(f => f.name));
   const addedFiles = newFiles.filter(f => !existingNames.has(f.name));
 
   if (addedFiles.length > 0) {
-    console.log(`新しい画像が ${addedFiles.length} 個追加されました`);
-
-    // allFiles の先頭に追加（降順を維持）
     allFiles = [...addedFiles, ...allFiles];
     displayedCount += addedFiles.length;
-    lastCheckedPhotoCount = allFiles.length;
 
-    // 新しいカードを先頭に挿入（gallery.innerHTML は触らない）
     const fragment = document.createDocumentFragment();
-    for (const file of [...addedFiles].reverse()) {
-      fragment.prepend(createImageCard(file));
-    }
+    for (const file of [...addedFiles].reverse()) fragment.prepend(createImageCard(file));
     gallery.prepend(fragment);
 
-    // 新しい写真のいいね数をバルク取得
     await bulkLoadLikes(addedFiles.map(f => f.name));
   }
 }
 
-// カード1枚を生成する関数（loadAllImages の差分挿入でも再利用）
 function createImageCard(file) {
-  const { data: urlData } = supabaseClient.storage
-    .from("photos")
-    .getPublicUrl(file.name);
+  const { data: urlData } = supabaseClient.storage.from("photos").getPublicUrl(file.name);
 
   const container = document.createElement("div");
-  container.style.cssText = `
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1;
-  `;
+  container.style.cssText = "position: relative; width: 100%; aspect-ratio: 1;";
 
   const img = document.createElement("img");
   img.src = urlData.publicUrl;
   img.loading = "lazy";
-  img.style.cssText = `
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 12px;
-    cursor: pointer;
-  `;
-
+  img.style.cssText = "width: 100%; height: 100%; object-fit: cover; border-radius: 12px; cursor: pointer;";
   img.onclick = () => {
     viewerImg.src = img.src;
     currentImageUrl = img.src;
@@ -460,26 +327,15 @@ function createImageCard(file) {
   const likeBtn = document.createElement("button");
   likeBtn.setAttribute("data-like-btn", file.name);
   likeBtn.style.cssText = `
-    position: absolute;
-    bottom: 8px;
-    right: 8px;
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 14px;
-    cursor: pointer;
-    z-index: 10;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: absolute; bottom: 8px; right: 8px;
+    background: rgba(255,255,255,0.9); border: none; border-radius: 20px;
+    padding: 6px 10px; font-size: 16px; cursor: pointer;
+    z-index: 10; transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   `;
-
-  const count = likesCache[file.name];
   const isLiked = userLikes[file.name] || false;
-
-  likeBtn.textContent = isLiked ? `❤️ ${count ?? 0}` : `🤍 ${count ?? 0}`;
-  likeBtn.style.color = isLiked ? "#ff4081" : "#999";
-
+  likeBtn.textContent = isLiked ? "❤️" : "🤍";
+  likeBtn.style.color  = isLiked ? "#ff4081" : "#999";
   likeBtn.onclick = async (e) => {
     e.stopPropagation();
     likeBtn.style.animation = "heartPulse 0.4s ease";
@@ -493,254 +349,110 @@ function createImageCard(file) {
 }
 
 function displayMoreImages() {
-  
-  if (isLoading) return;
-  if (displayedCount >= allFiles.length) return;
-  
+  if (isLoading || displayedCount >= allFiles.length) return;
   isLoading = true;
-  
+
   const endIndex = Math.min(displayedCount + itemsPerPage, allFiles.length);
   const newlyRendered = [];
 
   for (let i = displayedCount; i < endIndex; i++) {
-    const file = allFiles[i];
-    gallery.appendChild(createImageCard(file));
-    newlyRendered.push(file.name);
+    gallery.appendChild(createImageCard(allFiles[i]));
+    newlyRendered.push(allFiles[i].name);
   }
-  
   displayedCount = endIndex;
   isLoading = false;
 
-  // スクロールで追加表示された分のいいね数をバルク取得（キャッシュ未取得分のみ）
-  const uncached = newlyRendered.filter(name => likesCache[name] === undefined);
-  if (uncached.length > 0) {
-    bulkLoadLikes(uncached);
-  }
+  const uncached = newlyRendered.filter(name => userLikes[name] === undefined);
+  if (uncached.length > 0) bulkLoadLikes(uncached);
 }
 
 loadAllImages();
 
 /* ==========================
-無限スクロール検出
+無限スクロール
 ========================== */
-
-const observerOptions = {
-  root: null,
-  rootMargin: '200px',
-  threshold: 0
-};
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting && displayedCount < allFiles.length) {
       displayMoreImages();
-      updateObserver(); // displayMoreImagesは同期処理なので直後で確実
+      updateObserver();
     }
   });
-}, observerOptions);
+}, { root: null, rootMargin: "200px", threshold: 0 });
 
 function updateObserver() {
-  const containers = gallery.querySelectorAll('div');
-  if (containers.length > 0) {
-    const lastContainer = containers[containers.length - 1];
-    observer.observe(lastContainer);
-  }
+  const containers = gallery.querySelectorAll("div");
+  if (containers.length > 0) observer.observe(containers[containers.length - 1]);
 }
 
-// loadAllImages()はawaitで呼んでいないのでここでは呼ばない
-// （初回ロード完了後にloadAllImages内部でupdateObserverを呼ぶ）
-
 /* ==========================
-Realtime + フォールバックポーリング
-50人同時接続を想定した二重構成
+Realtime - photosのみ（いいねRTは削除）
 ========================== */
 
 let photosChannel = null;
-let likesChannel = null;
-let isLikesChannelConnected = false;
-let isReconnecting = false;
-let pollIntervalId = null;
-
-// ── ポーリング：表示中の全ファイルのいいね数を定期再取得 ──
-// WebSocketが届かない場合のフォールバック（15秒ごと）
-function startPolling() {
-  if (pollIntervalId) return; // 多重起動防止
-  pollIntervalId = setInterval(async () => {
-    if (displayedCount === 0) return;
-    const visibleNames = allFiles.slice(0, displayedCount).map(f => f.name);
-    await bulkLoadLikes(visibleNames);
-  }, 15000);
-}
-
-function stopPolling() {
-  if (pollIntervalId) {
-    clearInterval(pollIntervalId);
-    pollIntervalId = null;
-  }
-}
 
 function setupRealtimeListeners() {
-  if (isReconnecting) return;
-  isReconnecting = true;
+  if (photosChannel) { supabaseClient.removeChannel(photosChannel); photosChannel = null; }
 
-  if (likesChannel) {
-    supabaseClient.removeChannel(likesChannel);
-    likesChannel = null;
-  }
-  if (photosChannel) {
-    supabaseClient.removeChannel(photosChannel);
-    photosChannel = null;
-  }
-
-  const ts = Date.now();
-
-  // ── likes チャンネル ──
-  // broadcast + postgres_changes の両方を試みる
-  likesChannel = supabaseClient.channel(`likes-${ts}`, {
-    config: { broadcast: { self: false } }
-  });
-
-  likesChannel
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'likes' },
-      (payload) => {
-        const fileName = payload.new?.file_name || payload.old?.file_name;
-        if (!fileName) return;
-
-        if (payload.eventType === 'INSERT') {
-          // 自分自身のINSERTはtoggleLike側で楽観的更新済みなのでスキップ
-          if (payload.new?.user_id === currentUserId) return;
-          likesCache[fileName] = (likesCache[fileName] || 0) + 1;
-        } else if (payload.eventType === 'DELETE') {
-          if (payload.old?.user_id === currentUserId) return;
-          likesCache[fileName] = Math.max(0, (likesCache[fileName] || 1) - 1);
-        }
-        updateLikeButtons(fileName);
-      }
-    )
-    .subscribe((status) => {
-      console.log('Likes channel status:', status);
-
-      if (status === 'SUBSCRIBED') {
-        isLikesChannelConnected = true;
-        isReconnecting = false;
-        // WebSocket成功 → ポーリング間隔を長めに（補完用として残す）
-        stopPolling();
-        startPolling(); // 15秒ポーリングは維持（WebSocketの取りこぼし補完）
-      } else if ((status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !isReconnecting) {
-        isLikesChannelConnected = false;
-        isReconnecting = true;
-        console.warn('Likes channel lost, reconnecting in 3s...');
-        setTimeout(() => {
-          isReconnecting = false;
-          setupRealtimeListeners();
-        }, 3000);
-      }
-    });
-
-  // ── photos チャンネル ──
-  photosChannel = supabaseClient.channel(`photos-${ts}`);
+  photosChannel = supabaseClient.channel(`photos-${Date.now()}`);
   photosChannel
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'storage', table: 'objects' },
-      (payload) => {
-        if (payload.new.bucket_id === "photos") loadAllImages();
-      }
-    )
-    .subscribe((status) => {
-      console.log('Photos channel status:', status);
-    });
+    .on("postgres_changes", { event: "INSERT", schema: "storage", table: "objects" }, (payload) => {
+      if (payload.new.bucket_id === "photos") loadAllImages();
+    })
+    .subscribe((status) => console.log("Photos channel:", status));
 }
 
-// 起動
 setupRealtimeListeners();
-startPolling(); // 接続確立前からポーリング開始（初期表示直後の他ユーザー操作をカバー）
 
-// 定期的に接続確認（30秒ごと）
-setInterval(() => {
-  if (!isLikesChannelConnected && !isReconnecting) {
-    console.warn('WebSocket接続が失われています。再接続します...');
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    if (photosChannel) supabaseClient.removeChannel(photosChannel);
+    photosChannel = null;
+  } else {
     setupRealtimeListeners();
   }
-}, 30000);
-
-// ページを離れる時にクリーンアップ
-window.addEventListener('beforeunload', () => {
-  stopPolling();
-  if (likesChannel) supabaseClient.removeChannel(likesChannel);
-  if (photosChannel) supabaseClient.removeChannel(photosChannel);
 });
 
-// ページ非表示時：停止、復帰時：再接続
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    stopPolling();
-    isReconnecting = true;
-    if (likesChannel) supabaseClient.removeChannel(likesChannel);
-    if (photosChannel) supabaseClient.removeChannel(photosChannel);
-    likesChannel = null;
-    photosChannel = null;
-    isLikesChannelConnected = false;
-    isReconnecting = false;
-  } else {
-    // 復帰時：まず即座にポーリングで最新状態を取得してからWebSocket再接続
-    (async () => {
-      if (displayedCount > 0) {
-        const visibleNames = allFiles.slice(0, displayedCount).map(f => f.name);
-        await bulkLoadLikes(visibleNames);
-      }
-      setupRealtimeListeners();
-      startPolling();
-    })();
-  }
+window.addEventListener("beforeunload", () => {
+  if (photosChannel) supabaseClient.removeChannel(photosChannel);
 });
 
 /* ==========================
 メニュー開閉
 ========================== */
 
-function openMenu() {
-  menuOpen = true;
-  menu.classList.remove("hidden");
-  menu.classList.add("show");
-}
+function openMenu()   { menuOpen = true;  menu.classList.remove("hidden"); menu.classList.add("show"); }
+function closeMenu()  { menuOpen = false; menu.classList.remove("show");   menu.classList.add("hidden"); }
+function toggleMenu() { if (menuOpen) closeMenu(); else openMenu(); }
 
-function closeMenu() {
-  menuOpen = false;
-  menu.classList.remove("show");
-  menu.classList.add("hidden");
-}
-
-function toggleMenu() {
-  if (menuOpen) {
-    closeMenu();
-  } else {
-    openMenu();
-  }
-}
-
-fab.onclick = (e) => {
-  e.stopPropagation();
-  toggleMenu();
-};
-
-cameraBtn.onclick = () => {
-  cameraInput.click();
-  closeMenu();
-};
-
-fileBtn.onclick = () => {
-  fileSelectInput.click();
-  closeMenu();
-};
+fab.onclick = (e) => { e.stopPropagation(); toggleMenu(); };
+cameraBtn.onclick = () => { cameraInput.click(); closeMenu(); };
+fileBtn.onclick   = () => { fileSelectInput.click(); closeMenu(); };
 
 document.addEventListener("click", (e) => {
-  if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) {
-    closeMenu();
-  }
+  if (menuOpen && !fab.contains(e.target) && !menu.contains(e.target)) closeMenu();
 });
+
+/* ==========================
+隠しボタン：ヘッダータイトルを5回タップでranking.htmlへ
+========================== */
+
+let titleTapCount = 0;
+let titleTapTimer = null;
+
+const headerTitle = document.querySelector(".header-title");
+if (headerTitle) {
+  headerTitle.addEventListener("click", () => {
+    titleTapCount++;
+    if (titleTapTimer) clearTimeout(titleTapTimer);
+    titleTapTimer = setTimeout(() => { titleTapCount = 0; }, 2000);
+    if (titleTapCount >= 5) {
+      titleTapCount = 0;
+      window.location.href = "ranking.html";
+    }
+  });
+}
 
 /* ==========================
 ファイル選択
@@ -750,20 +462,11 @@ cameraInput.onchange = handleFile;
 fileSelectInput.onchange = handleFile;
 
 function handleFile(e) {
-
   selectedFile = e.target.files[0];
-
   if (!selectedFile) return;
-
-  // 古いblob URLがあれば解放
-  if (previewImage.src.startsWith("blob:")) {
-    URL.revokeObjectURL(previewImage.src);
-  }
-
+  if (previewImage.src.startsWith("blob:")) URL.revokeObjectURL(previewImage.src);
   previewImage.src = URL.createObjectURL(selectedFile);
-
   previewModal.classList.remove("hidden");
-
 }
 
 /* ==========================
@@ -772,14 +475,7 @@ function handleFile(e) {
 
 cancelUpload.onclick = () => {
   previewModal.classList.add("hidden");
-
-  // blob URL を解放（メモリリーク防止）
-  if (previewImage.src.startsWith("blob:")) {
-    URL.revokeObjectURL(previewImage.src);
-    previewImage.src = "";
-  }
-
-  // input をリセット（同じ写真を再選択できるように）
+  if (previewImage.src.startsWith("blob:")) { URL.revokeObjectURL(previewImage.src); previewImage.src = ""; }
   cameraInput.value = "";
   fileSelectInput.value = "";
   selectedFile = null;
@@ -789,12 +485,10 @@ cancelUpload.onclick = () => {
 アップロード
 ========================== */
 
-let isUploading = false; // 二重アップロード防止フラグ
+let isUploading = false;
 
 confirmUpload.onclick = async () => {
-
-  if (!selectedFile) return;
-  if (isUploading) return; // 二重送信を完全ブロック
+  if (!selectedFile || isUploading) return;
 
   isUploading = true;
   confirmUpload.disabled = true;
@@ -804,29 +498,23 @@ confirmUpload.onclick = async () => {
   spinner.classList.remove("hidden");
 
   const compressedBlob = await compressImage(selectedFile);
-
   uploadStatus.textContent = "アップロード中…";
 
-  const fileName = Date.now() + ".jpg";
+  // ファイル名にseat番号を埋め込む（ランキング集計用）
+  const fileName = `${Date.now()}_seat${currentSeatNumber}.jpg`;
 
   const { error } = await supabaseClient.storage
     .from("photos")
-    .upload(fileName, compressedBlob, {
-      contentType: "image/jpeg"
-    });
+    .upload(fileName, compressedBlob, { contentType: "image/jpeg" });
 
   if (error) {
-
     uploadStatus.textContent = "";
     spinner.classList.add("hidden");
     showToast("アップロードに失敗しました");
-
     isUploading = false;
     confirmUpload.disabled = false;
     cancelUpload.disabled = false;
-
     return;
-
   }
 
   uploadStatus.textContent = "アップロード完了！";
@@ -834,29 +522,18 @@ confirmUpload.onclick = async () => {
   showToast("アップロードしました");
 
   setTimeout(() => {
-
     previewModal.classList.add("hidden");
-
-    // input をリセット（同じ写真を再選択できるように）
     cameraInput.value = "";
     fileSelectInput.value = "";
     selectedFile = null;
-
     isUploading = false;
     confirmUpload.disabled = false;
     cancelUpload.disabled = false;
     uploadStatus.textContent = "";
-
   }, 800);
 
-  // Realtimeのphotosチャンネルが loadAllImages() を呼ぶので
-  // ここでは呼ばない（二重処理防止）
-  // ただしRealtimeが届かない環境のためフォールバックとして遅延実行
-  setTimeout(() => {
-    // Realtimeで既に追加済みなら差分なしでスキップされる
-    loadAllImages();
-  }, 3000);
-
+  // Realtimeが届かない環境へのフォールバック
+  setTimeout(() => loadAllImages(), 3000);
 };
 
 /* ==========================
