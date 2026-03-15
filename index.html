@@ -41,11 +41,14 @@
   </main>
 
   <!-- 画像拡大ビュー -->
-  <div id="viewer" class="viewer hidden">
-    <button id="closeViewer" class="close-btn">✕</button>
-    <div class="viewer-content">
+  <div id="viewer" class="modal hidden">
+    <div class="modal-content">
+      <h2>Wedding Photo</h2>
       <img id="viewerImg" alt="Wedding Photo">
-      <button id="downloadBtn" class="download-btn">保存する</button>
+      <div class="button-group">
+        <button id="downloadBtn" class="btn btn-primary">保存する</button>
+        <button id="closeViewer" class="btn btn-secondary">閉じる</button>
+      </div>
     </div>
   </div>
 

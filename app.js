@@ -187,6 +187,7 @@ function updateLikeButtons(fileName) {
 Viewer
 ========================== */
 
+// 背景タップで閉じる（モーダルと同じ）
 viewer.onclick = (e) => {
   if (e.target === viewer) viewer.classList.add("hidden");
 };
