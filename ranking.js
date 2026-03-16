@@ -209,8 +209,8 @@ async function renderRanking() {
   if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
-      // 最後のカード（1位）登場タイミング + 押し下げ完了 + スライドイン完了 + 余裕
-      const totalDelay = (reversed.length - 1) * 1500 + 5000 + 3000 + 500;
+      // 1位が登場するタイミング + スライドイン完了 + 少し余裕
+      const totalDelay = (reversed.length - 1) * 1500 + 3000 + 800;
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
