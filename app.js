@@ -172,6 +172,11 @@ async function bulkLoadLikeCounts(fileNames) {
 async function toggleLike(fileName) {
   const wasLiked = userLikes[fileName] ?? false;
   userLikes[fileName] = !wasLiked;
+
+  // 楽観的更新：いいね数も即座に反映
+  if (isRevealMode) {
+    likeCounts[fileName] = (likeCounts[fileName] || 0) + (wasLiked ? -1 : 1);
+  }
   updateLikeButtons(fileName);
 
   try {
@@ -187,7 +192,11 @@ async function toggleLike(fileName) {
     }
   } catch (err) {
     console.error("いいね操作エラー:", err);
+    // 失敗時はロールバック
     userLikes[fileName] = wasLiked;
+    if (isRevealMode) {
+      likeCounts[fileName] = (likeCounts[fileName] || 0) + (wasLiked ? 1 : -1);
+    }
     updateLikeButtons(fileName);
     showToast(err.status === 429 ? "混雑しています。少し後でお試しください" : "エラーが発生しました");
   }
