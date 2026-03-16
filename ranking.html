@@ -206,8 +206,9 @@ html, body {
 /* 各順位ブロック（同率対応：横並びグリッド） */
 .rank-block {
   opacity: 0;
-  transform: translateY(80px);
-  transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateY(90px);
+  transition: opacity 1.1s cubic-bezier(0.16, 1, 0.3, 1), transform 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 .rank-block.visible {
@@ -709,26 +710,15 @@ async function renderRanking() {
   // ① 戻るボタンを表示
   document.getElementById("backBtn").style.display = "";
 
-  // 5位→1位の順に1枚ずつ登場して積み上がる
-  // ranked は rank=1が先頭なので、逆順（rank=5から）に表示する
+  // 全ブロックを取得（DOM順：1位が先頭）
   const blocks = Array.from(rankList.querySelectorAll(".rank-block"));
-  // 最初は全ブロックを非表示（opacity:0 かつ position外）
-  blocks.forEach(block => {
-    block.style.display = "none";
-  });
 
-  // 逆順（5位→1位）に1つずつ表示してスライドイン
+  // 5位→1位の順に登場（display切り替えなし・opacityのみ）
   const reversed = [...blocks].reverse();
   reversed.forEach((block, idx) => {
     setTimeout(() => {
-      block.style.display = "";
-      // 少し遅らせてからvisibleクラスを付けてアニメーション発火
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          block.classList.add("visible");
-        });
-      });
-    }, idx * 1100);
+      block.classList.add("visible");
+    }, idx * 1300);
   });
 
   // 自分が1位グループにいるか確認
@@ -736,7 +726,7 @@ async function renderRanking() {
   if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
-      const totalDelay = reversed.length * 1100 + 1000;
+      const totalDelay = reversed.length * 1300 + 1200;
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
