@@ -180,7 +180,7 @@ async function renderRanking() {
         block.classList.add("visible");
       }));
       window.scrollTo({ top: 0, behavior: "smooth" });
-    }, idx * 1300);
+    }, idx * 1800);
   });
 
   // 自分が1位グループにいるか確認
@@ -188,7 +188,7 @@ async function renderRanking() {
   if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
-      const totalDelay = reversed.length * 1300 + 1200;
+      const totalDelay = reversed.length * 1800 + 2000;
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
