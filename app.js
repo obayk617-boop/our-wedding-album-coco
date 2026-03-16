@@ -659,8 +659,8 @@ async function enterRevealMode() {
     )
     .subscribe();
 
-  // 60秒ポーリング（Realtimeのフォールバック）
-  likeCountPollTimer = setInterval(refreshAllLikeCounts, 60000);
+  // 30秒ポーリング（Realtimeのフォールバック・DELETE未検知の補完）
+  likeCountPollTimer = setInterval(refreshAllLikeCounts, 30000);
 }
 
 // 起動時にフラグ確認
