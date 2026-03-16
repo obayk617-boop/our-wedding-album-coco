@@ -625,11 +625,20 @@ async function enterRevealMode() {
   likeCountChannel = supabaseClient
     .channel("likes-watch")
     .on("postgres_changes",
-      { event: "*", schema: "public", table: "likes" },
+      { event: "INSERT", schema: "public", table: "likes" },
       async (payload) => {
-        const fileName = payload.new?.file_name || payload.old?.file_name;
+        const fileName = payload.new?.file_name;
         if (!fileName) return;
-        await bulkLoadLikeCounts([fileName]);
+        likeCounts[fileName] = (likeCounts[fileName] || 0) + 1;
+        updateLikeButtons(fileName);
+      }
+    )
+    .on("postgres_changes",
+      { event: "DELETE", schema: "public", table: "likes" },
+      async (payload) => {
+        const fileName = payload.old?.file_name;
+        if (!fileName) return;
+        likeCounts[fileName] = Math.max((likeCounts[fileName] || 0) - 1, 0);
         updateLikeButtons(fileName);
       }
     )
