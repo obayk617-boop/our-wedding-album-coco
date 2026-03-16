@@ -194,9 +194,11 @@ html, body {
 .rank-block {
   opacity: 0;
   transform: translateY(-40px);
+  visibility: hidden;
   transition:
     opacity 2.2s cubic-bezier(0.25, 1, 0.5, 1),
-    transform 2.2s cubic-bezier(0.25, 1, 0.5, 1);
+    transform 2.2s cubic-bezier(0.25, 1, 0.5, 1),
+    visibility 0s 0s;
   will-change: opacity, transform;
 }
 
@@ -207,6 +209,7 @@ html, body {
 .rank-block.visible {
   opacity: 1;
   transform: translateY(0);
+  visibility: visible;
 }
 
 .rank-label {
