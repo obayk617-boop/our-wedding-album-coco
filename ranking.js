@@ -209,8 +209,7 @@ async function renderRanking() {
   if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
-      // 1位が登場するタイミング + スライドイン完了 + 少し余裕
-      const totalDelay = (reversed.length - 1) * 1500 + 3000 + 800;
+      const totalDelay = (reversed.length - 1) * 1500 + 2000;
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
