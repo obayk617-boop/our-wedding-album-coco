@@ -709,10 +709,26 @@ async function renderRanking() {
   // ① 戻るボタンを表示
   document.getElementById("backBtn").style.display = "";
 
-  // 5位→1位の順でスライドイン（下から上へ）
-  const blocks = Array.from(rankList.querySelectorAll(".rank-block")).reverse();
-  blocks.forEach((block, idx) => {
-    setTimeout(() => block.classList.add("visible"), idx * 400);
+  // 5位→1位の順に1枚ずつ登場して積み上がる
+  // ranked は rank=1が先頭なので、逆順（rank=5から）に表示する
+  const blocks = Array.from(rankList.querySelectorAll(".rank-block"));
+  // 最初は全ブロックを非表示（opacity:0 かつ position外）
+  blocks.forEach(block => {
+    block.style.display = "none";
+  });
+
+  // 逆順（5位→1位）に1つずつ表示してスライドイン
+  const reversed = [...blocks].reverse();
+  reversed.forEach((block, idx) => {
+    setTimeout(() => {
+      block.style.display = "";
+      // 少し遅らせてからvisibleクラスを付けてアニメーション発火
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          block.classList.add("visible");
+        });
+      });
+    }, idx * 800);
   });
 
   // 自分が1位グループにいるか確認
@@ -720,7 +736,7 @@ async function renderRanking() {
   if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
-      const totalDelay = blocks.length * 400 + 600;
+      const totalDelay = reversed.length * 800 + 800;
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
