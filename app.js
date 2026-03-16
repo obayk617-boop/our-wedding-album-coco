@@ -169,6 +169,22 @@ async function bulkLoadLikeCounts(fileNames) {
   }
 }
 
+// 1枚の写真のいいね数をDBから正確に取得して上書き
+async function fetchLikeCount(fileName) {
+  try {
+    const { count, error } = await supabaseClient
+      .from("likes")
+      .select("*", { count: "exact", head: true })
+      .eq("file_name", fileName);
+    if (!error) {
+      likeCounts[fileName] = count || 0;
+      updateLikeButtons(fileName);
+    }
+  } catch (err) {
+    console.error("いいね数取得エラー:", err);
+  }
+}
+
 async function toggleLike(fileName) {
   const wasLiked = userLikes[fileName] ?? false;
   userLikes[fileName] = !wasLiked;
@@ -192,12 +208,10 @@ async function toggleLike(fileName) {
     }
   } catch (err) {
     console.error("いいね操作エラー:", err);
-    // 失敗時はロールバック
+    // 失敗時はロールバック（DBから正確な数字を取得）
     userLikes[fileName] = wasLiked;
-    if (isRevealMode) {
-      likeCounts[fileName] = (likeCounts[fileName] || 0) + (wasLiked ? 1 : -1);
-    }
-    updateLikeButtons(fileName);
+    if (isRevealMode) await fetchLikeCount(fileName);
+    else updateLikeButtons(fileName);
     showToast(err.status === 429 ? "混雑しています。少し後でお試しください" : "エラーが発生しました");
   }
 }
@@ -621,7 +635,7 @@ async function enterRevealMode() {
   // 全ボタンのいいね数を取得して表示
   await refreshAllLikeCounts();
 
-  // Realtimeでいいね数をリアルタイム更新
+  // Realtimeはトリガーとしてだけ使い、必ずDBから正確な数字を取得
   // ※自分の操作は楽観的更新済みのためスキップ
   likeCountChannel = supabaseClient
     .channel("likes-watch")
@@ -631,8 +645,7 @@ async function enterRevealMode() {
         const fileName = payload.new?.file_name;
         const userId   = payload.new?.user_id;
         if (!fileName || userId === currentUserId) return;
-        likeCounts[fileName] = (likeCounts[fileName] || 0) + 1;
-        updateLikeButtons(fileName);
+        await fetchLikeCount(fileName);
       }
     )
     .on("postgres_changes",
@@ -641,8 +654,7 @@ async function enterRevealMode() {
         const fileName = payload.old?.file_name;
         const userId   = payload.old?.user_id;
         if (!fileName || userId === currentUserId) return;
-        likeCounts[fileName] = Math.max((likeCounts[fileName] || 0) - 1, 0);
-        updateLikeButtons(fileName);
+        await fetchLikeCount(fileName);
       }
     )
     .subscribe();
