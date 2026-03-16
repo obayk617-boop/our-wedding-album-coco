@@ -622,13 +622,15 @@ async function enterRevealMode() {
   await refreshAllLikeCounts();
 
   // Realtimeでいいね数をリアルタイム更新
+  // ※自分の操作は楽観的更新済みのためスキップ
   likeCountChannel = supabaseClient
     .channel("likes-watch")
     .on("postgres_changes",
       { event: "INSERT", schema: "public", table: "likes" },
       async (payload) => {
         const fileName = payload.new?.file_name;
-        if (!fileName) return;
+        const userId   = payload.new?.user_id;
+        if (!fileName || userId === currentUserId) return;
         likeCounts[fileName] = (likeCounts[fileName] || 0) + 1;
         updateLikeButtons(fileName);
       }
@@ -637,7 +639,8 @@ async function enterRevealMode() {
       { event: "DELETE", schema: "public", table: "likes" },
       async (payload) => {
         const fileName = payload.old?.file_name;
-        if (!fileName) return;
+        const userId   = payload.old?.user_id;
+        if (!fileName || userId === currentUserId) return;
         likeCounts[fileName] = Math.max((likeCounts[fileName] || 0) - 1, 0);
         updateLikeButtons(fileName);
       }
