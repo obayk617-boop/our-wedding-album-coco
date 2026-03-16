@@ -187,7 +187,6 @@ html, body {
 .rank-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
   padding: 8px 16px;
 }
 
@@ -195,15 +194,27 @@ html, body {
 .rank-block {
   opacity: 0;
   transform: translateY(-40px);
+  margin-top: 0;
+  max-height: 0;
+  overflow: hidden;
   transition:
     opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    margin-top 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 0.7s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
 .rank-block.visible {
   opacity: 1;
   transform: translateY(0);
+  margin-top: 16px;
+  max-height: 600px;
+  overflow: visible;
+}
+
+.rank-block:first-child.visible {
+  margin-top: 0;
 }
 
 .rank-label {
