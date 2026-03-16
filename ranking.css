@@ -1,0 +1,486 @@
+@font-face {
+  font-family: 'WaltDisney';
+  src: url('WaltDisney.ttf') format('truetype');
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent: #29b6d8;
+  --accent-dark: #0097b8;
+  --gold:   #f5c842;
+  --silver: #b0bec5;
+  --bronze: #cd7f32;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(180deg, #0a2a3a 0%, #0d4a6a 40%, #0d6a8a 70%, #29b6d8 100%);
+  background-attachment: fixed;
+  color: white;
+  overflow-x: hidden;
+}
+
+/* =====================
+波アニメーション（海モチーフ）
+===================== */
+
+.waves {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 80px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.25;
+}
+
+.wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 60px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 60'%3E%3Cpath d='M0 30 Q100 0 200 30 Q300 60 400 30 Q500 0 600 30 Q700 60 800 30 L800 60 L0 60Z' fill='%2329b6d8'/%3E%3C/svg%3E") repeat-x;
+  background-size: 800px 60px;
+  animation: waveMove 6s linear infinite;
+}
+
+.wave:nth-child(2) {
+  bottom: 8px;
+  opacity: 0.5;
+  animation: waveMove 9s linear infinite reverse;
+}
+
+@keyframes waveMove {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* =====================
+待機画面
+===================== */
+
+#waitingScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 24px;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.waiting-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-12px); }
+}
+
+.waiting-title {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.waiting-sub {
+  font-size: 13px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  line-height: 1.8;
+}
+
+/* =====================
+カウントダウン
+===================== */
+
+#countdownScreen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.countdown-label {
+  font-size: 14px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 16px;
+}
+
+.countdown-number {
+  font-size: 120px;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -4px;
+  color: white;
+  text-shadow: 0 0 40px rgba(41,182,216,0.8);
+  animation: countPulse 1s ease-in-out;
+}
+
+@keyframes countPulse {
+  0%   { transform: scale(1.4); opacity: 0.4; }
+  60%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* =====================
+ランキング画面
+===================== */
+
+#rankingScreen {
+  display: none;
+  flex-direction: column;
+  padding: 0 0 100px;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+.ranking-header {
+  text-align: center;
+  padding: calc(32px + env(safe-area-inset-top)) 24px 24px;
+}
+
+.ranking-eyebrow {
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+.ranking-title {
+  font-size: 28px;
+  font-weight: 200;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+}
+
+.ranking-title::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: rgba(255,255,255,0.4);
+  margin: 12px auto 0;
+}
+
+/* ランクカード */
+.rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 16px;
+}
+
+/* 各順位ブロック（同率対応：横並びグリッド） */
+.rank-block {
+  opacity: 0;
+  transform: translateY(-40px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.rank-block.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.rank-label {
+  font-size: 30px;
+  letter-spacing: 2px;
+  opacity: 0.95;
+  margin-bottom: 12px;
+  padding-left: 4px;
+  font-weight: 400;
+}
+
+/* Cinzelは数字・アルファベット部分に適用 */
+.rank-label .cinzel {
+  font-family: 'WaltDisney', serif;
+}
+
+/* 同率が複数いても横に並ぶ・1枚のときは中央寄せ */
+.rank-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* 1枚のとき：幅広 */
+.rank-cards.single .rank-card {
+  width: 240px;
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+
+/* 2枚以上のとき：通常幅 */
+.rank-cards.multi .rank-card {
+  width: 160px;
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+
+.rank-card {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  position: relative;
+}
+
+/* 1位は少し大きく */
+.rank-block.rank-1 .rank-card {
+  border-color: rgba(245,200,66,0.5);
+  background: rgba(245,200,66,0.1);
+}
+
+.rank-block.rank-2 .rank-card {
+  border-color: rgba(176,190,197,0.4);
+  background: rgba(176,190,197,0.08);
+}
+
+.rank-block.rank-3 .rank-card {
+  border-color: rgba(205,127,50,0.4);
+  background: rgba(205,127,50,0.08);
+}
+
+.rank-card-photo {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.rank-card-info {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rank-card-seat {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-card-count {
+  font-size: 13px;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+/* 順位バッジ */
+.rank-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.rank-block.rank-1 .rank-badge { background: var(--gold);   color: #7a5c00; }
+.rank-block.rank-2 .rank-badge { background: var(--silver); color: #37474f; }
+.rank-block.rank-3 .rank-badge { background: var(--bronze); color: #5d3600; }
+.rank-block.rank-4 .rank-card {
+  border-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.18);
+}
+.rank-block.rank-5 .rank-card {
+  border-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.18);
+}
+.rank-block.rank-4 .rank-badge { background: rgba(255,255,255,0.9); color: #333; font-weight: 700; }
+.rank-block.rank-5 .rank-badge { background: rgba(255,255,255,0.9); color: #333; font-weight: 700; }
+
+/* =====================
+自分が1位の演出
+===================== */
+
+#winnerBanner {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 999;
+  background: rgba(0,0,0,0.7);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 40px;
+}
+
+#winnerBanner.show {
+  display: flex;
+}
+
+.winner-emoji {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: winnerBounce 0.6s ease;
+}
+
+@keyframes winnerBounce {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.winner-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--gold);
+  letter-spacing: 2px;
+}
+
+.winner-sub {
+  font-size: 15px;
+  opacity: 0.8;
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+.winner-close {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* =====================
+紙吹雪
+===================== */
+
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  z-index: 1000;
+  animation: confettiFall linear forwards;
+  pointer-events: none;
+}
+
+@keyframes confettiFall {
+  0%   { transform: translateY(-20px) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* =====================
+エラー/空状態
+===================== */
+
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  opacity: 0.5;
+  font-size: 14px;
+  line-height: 2;
+}
+
+/* =====================
+戻るボタン
+===================== */
+
+.back-btn {
+  position: fixed;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 16px;
+  z-index: 50;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.back-btn:active {
+  background: rgba(255,255,255,0.25);
+  transform: scale(0.96);
+}
+
+/* ② ランキングヘッダーは戻るボタン分の余白を確保 */
+#rankingScreen .ranking-header {
+  padding-top: calc(64px + env(safe-area-inset-top));
+}
+
+/* =====================
+ダウンロードボタン
+===================== */
+
+.rank-card-dl {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  padding: 8px;
+  /* 完全不透明で下地の金色を確実に遮断 */
+  background: #0d4a6a;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.rank-card-dl:active {
+  background: #0a3a52;
+  transform: scale(0.97);
+}
