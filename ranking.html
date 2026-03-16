@@ -206,8 +206,10 @@ html, body {
 /* 各順位ブロック（同率対応：横並びグリッド） */
 .rank-block {
   opacity: 0;
-  transform: translateY(90px);
-  transition: opacity 1.1s cubic-bezier(0.16, 1, 0.3, 1), transform 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(-40px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
@@ -710,14 +712,20 @@ async function renderRanking() {
   // ① 戻るボタンを表示
   document.getElementById("backBtn").style.display = "";
 
-  // 全ブロックを取得（DOM順：1位が先頭）
-  const blocks = Array.from(rankList.querySelectorAll(".rank-block"));
+  // DOMから全ブロックを取り出してリストを空にする
+  const allBlocks = Array.from(rankList.querySelectorAll(".rank-block"));
+  rankList.innerHTML = "";
 
-  // 5位→1位の順に登場：blocksはDOMの1位〜5位順なので、
-  // 末尾（5位）から先にvisibleにして積み上がって見せる
-  blocks.slice().reverse().forEach((block, idx) => {
+  // 5位→1位の順に上から追加 → 追加のたびに先頭へスクロール
+  // 常に画面上部で降ってくる様子が見える
+  const reversed = [...allBlocks].reverse();
+  reversed.forEach((block, idx) => {
     setTimeout(() => {
-      block.classList.add("visible");
+      rankList.prepend(block);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        block.classList.add("visible");
+      }));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }, idx * 1300);
   });
 
@@ -730,7 +738,6 @@ async function renderRanking() {
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }
-}
 
 /* ==========================
 ③ ダウンロード処理
