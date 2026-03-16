@@ -194,27 +194,19 @@ html, body {
 .rank-block {
   opacity: 0;
   transform: translateY(-40px);
-  margin-top: 0;
-  max-height: 0;
-  overflow: hidden;
   transition:
     opacity 2.2s cubic-bezier(0.25, 1, 0.5, 1),
-    transform 2.2s cubic-bezier(0.25, 1, 0.5, 1),
-    margin-top 2.8s cubic-bezier(0.16, 1, 0.2, 1),
-    max-height 2.8s cubic-bezier(0.16, 1, 0.2, 1);
+    transform 2.2s cubic-bezier(0.25, 1, 0.5, 1);
   will-change: opacity, transform;
+}
+
+.rank-block + .rank-block {
+  margin-top: 16px;
 }
 
 .rank-block.visible {
   opacity: 1;
   transform: translateY(0);
-  margin-top: 16px;
-  max-height: 600px;
-  overflow: visible;
-}
-
-.rank-block:first-child.visible {
-  margin-top: 0;
 }
 
 .rank-label {

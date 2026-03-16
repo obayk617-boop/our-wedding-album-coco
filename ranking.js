@@ -168,17 +168,13 @@ async function renderRanking() {
 
   // DOMから全ブロックを取り出してリストを空にする
   const allBlocks = Array.from(rankList.querySelectorAll(".rank-block"));
-  rankList.innerHTML = "";
 
-  // 5位→1位の順に上から追加 → 追加のたびに先頭へスクロール
-  // 常に画面上部で降ってくる様子が見える
+  // 全ブロックをすでにDOMに置いた状態（opacity:0）で高さだけ確保
+  // → 順番にvisibleにするだけでブレなし
   const reversed = [...allBlocks].reverse();
   reversed.forEach((block, idx) => {
     setTimeout(() => {
-      rankList.prepend(block);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        block.classList.add("visible");
-      }));
+      block.classList.add("visible");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, idx * 1800);
   });
