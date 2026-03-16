@@ -174,6 +174,7 @@ async function renderRanking() {
     spacer.style.height = block.offsetHeight + "px";
     spacer.style.marginTop = "16px";
     spacer.style.flexShrink = "0";
+    spacer.style.transition = "height 5.0s cubic-bezier(0.25, 1, 0.5, 1), margin-top 5.0s cubic-bezier(0.25, 1, 0.5, 1)";
     return spacer;
   });
 
@@ -181,19 +182,26 @@ async function renderRanking() {
   rankList.innerHTML = "";
   spacers.forEach(s => rankList.appendChild(s));
 
-  // 5位から順にprependで追加、対応スペーサーを削除
+  // 5位から順にprependで追加、対応スペーサーをアニメーションしながら縮小
   const reversed = [...allBlocks].reverse();
   const reversedSpacers = [...spacers].reverse();
   reversed.forEach((block, idx) => {
     setTimeout(() => {
-      // スペーサー削除してブロックを先頭に追加
-      reversedSpacers[idx].remove();
+      const spacer = reversedSpacers[idx];
+      // スペーサーをゆっくり縮小（押し下げアニメーション）
+      requestAnimationFrame(() => {
+        spacer.style.height = "0px";
+        spacer.style.marginTop = "0px";
+      });
+      // ブロックを先頭に追加してフェードイン
       rankList.prepend(block);
       requestAnimationFrame(() => requestAnimationFrame(() => {
         block.classList.add("visible");
       }));
+      // スペーサー縮小完了後に削除
+      setTimeout(() => spacer.remove(), 5100);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    }, idx * 1800);
+    }, idx * 1500);
   });
 
   // 自分が1位グループにいるか確認
@@ -201,7 +209,7 @@ async function renderRanking() {
   if (firstGroup) {
     const isWinner = firstGroup.items.some(item => item.seat === mySeat);
     if (isWinner) {
-      const totalDelay = reversed.length * 1800 + 2000;
+      const totalDelay = reversed.length * 1500 + 5000 + 1000;
       setTimeout(() => showWinnerBanner(), totalDelay);
     }
   }

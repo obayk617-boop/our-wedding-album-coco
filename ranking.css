@@ -195,8 +195,8 @@ html, body {
   opacity: 0;
   transform: translateY(-40px);
   transition:
-    opacity 2.2s cubic-bezier(0.25, 1, 0.5, 1),
-    transform 2.2s cubic-bezier(0.25, 1, 0.5, 1);
+    opacity 3.0s cubic-bezier(0.25, 1, 0.5, 1),
+    transform 3.0s cubic-bezier(0.25, 1, 0.5, 1);
   will-change: opacity, transform;
 }
 
