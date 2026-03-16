@@ -166,15 +166,32 @@ async function renderRanking() {
   // ① 戻るボタンを表示
   document.getElementById("backBtn").style.display = "";
 
-  // DOMから全ブロックを取り出してリストを空にする
+  // 各ブロックの高さをスペーサーで事前確保
+  // → prependで追加してもレイアウトがずれない
   const allBlocks = Array.from(rankList.querySelectorAll(".rank-block"));
+  const spacers = allBlocks.map(block => {
+    const spacer = document.createElement("div");
+    spacer.style.height = block.offsetHeight + "px";
+    spacer.style.marginTop = "16px";
+    spacer.style.flexShrink = "0";
+    return spacer;
+  });
 
-  // 全ブロックをすでにDOMに置いた状態（opacity:0）で高さだけ確保
-  // → 順番にvisibleにするだけでブレなし
+  // 全ブロックをDOMから取り出してスペーサーに置き換える
+  rankList.innerHTML = "";
+  spacers.forEach(s => rankList.appendChild(s));
+
+  // 5位から順にprependで追加、対応スペーサーを削除
   const reversed = [...allBlocks].reverse();
+  const reversedSpacers = [...spacers].reverse();
   reversed.forEach((block, idx) => {
     setTimeout(() => {
-      block.classList.add("visible");
+      // スペーサー削除してブロックを先頭に追加
+      reversedSpacers[idx].remove();
+      rankList.prepend(block);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        block.classList.add("visible");
+      }));
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, idx * 1800);
   });
