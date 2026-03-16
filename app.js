@@ -76,6 +76,8 @@ let displayedCount = 0;
 const itemsPerPage = 12;
 let isLoading = false;
 let userLikes = {};
+let likeCounts = {};        // 各写真のいいね数キャッシュ
+let isRevealMode = false;   // ランキング発表後フラグ
 let isInitialLoadDone = false;
 
 /* ==========================
@@ -142,9 +144,28 @@ async function bulkLoadLikes(fileNames) {
         userLikes[name] = mySet.has(name);
       }
     }
+    if (isRevealMode) await bulkLoadLikeCounts(fileNames);
     for (const name of fileNames) updateLikeButtons(name);
   } catch (err) {
     console.error("いいね取得エラー:", err);
+  }
+}
+
+async function bulkLoadLikeCounts(fileNames) {
+  if (!fileNames.length) return;
+  try {
+    const { data, error } = await supabaseClient
+      .from("likes")
+      .select("file_name")
+      .in("file_name", fileNames);
+    if (!error && data) {
+      for (const name of fileNames) likeCounts[name] = 0;
+      for (const row of data) {
+        likeCounts[row.file_name] = (likeCounts[row.file_name] || 0) + 1;
+      }
+    }
+  } catch (err) {
+    console.error("いいね数取得エラー:", err);
   }
 }
 
@@ -176,7 +197,10 @@ function updateLikeButtons(fileName) {
   const btn = document.querySelector(`[data-like-btn="${fileName}"]`);
   if (btn) {
     const isLiked = userLikes[fileName] || false;
-    btn.textContent = isLiked ? "❤️" : "🤍";
+    const count   = likeCounts[fileName] || 0;
+    btn.textContent = isRevealMode
+      ? (isLiked ? `❤️ ${count}` : `🤍 ${count}`)
+      : (isLiked ? "❤️" : "🤍");
     btn.style.background = isLiked ? "rgba(255,64,129,0.18)" : "rgba(255,255,255,0.18)";
     btn.style.border     = `1px solid ${isLiked ? "rgba(255,64,129,0.45)" : "rgba(255,255,255,0.35)"}`;
     btn.style.color      = isLiked ? "#ff4081" : "rgba(255,255,255,0.85)";
@@ -563,3 +587,72 @@ confirmUpload.onclick = async () => {
 
 previewModal.classList.add("hidden");
 viewer.classList.add("hidden");
+
+/* ==========================
+ランキング発表監視
+発表後：いいね数表示 + Realtimeで更新 + 60秒ポーリング
+========================== */
+
+let likeCountChannel = null;
+let likeCountPollTimer = null;
+
+// 全表示済み写真のいいね数を更新して画面に反映
+async function refreshAllLikeCounts() {
+  const names = allFiles.slice(0, displayedCount).map(f => f.name);
+  if (!names.length) return;
+  await bulkLoadLikeCounts(names);
+  for (const name of names) updateLikeButtons(name);
+}
+
+// 発表後モードに切り替え
+async function enterRevealMode() {
+  if (isRevealMode) return;
+  isRevealMode = true;
+
+  // 全ボタンのいいね数を取得して表示
+  await refreshAllLikeCounts();
+
+  // Realtimeでいいね数をリアルタイム更新
+  likeCountChannel = supabaseClient
+    .channel("likes-watch")
+    .on("postgres_changes",
+      { event: "*", schema: "public", table: "likes" },
+      async (payload) => {
+        const fileName = payload.new?.file_name || payload.old?.file_name;
+        if (!fileName) return;
+        await bulkLoadLikeCounts([fileName]);
+        updateLikeButtons(fileName);
+      }
+    )
+    .subscribe();
+
+  // 60秒ポーリング（Realtimeのフォールバック）
+  likeCountPollTimer = setInterval(refreshAllLikeCounts, 60000);
+}
+
+// 起動時にフラグ確認
+async function checkRevealStatus() {
+  const { data } = await supabaseClient
+    .from("settings")
+    .select("value")
+    .eq("key", "reveal_ranking")
+    .single();
+
+  if (data?.value === "true") {
+    enterRevealMode();
+    return;
+  }
+
+  // 未発表ならRealtimeで発表を待つ
+  supabaseClient
+    .channel("reveal-watch")
+    .on("postgres_changes",
+      { event: "UPDATE", schema: "public", table: "settings", filter: "key=eq.reveal_ranking" },
+      (payload) => {
+        if (payload.new?.value === "true") enterRevealMode();
+      }
+    )
+    .subscribe();
+}
+
+checkRevealStatus();
