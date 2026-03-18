@@ -637,8 +637,9 @@ async function enterRevealMode() {
 
   // Realtimeはトリガーとしてだけ使い、必ずDBから正確な数字を取得
   // ※自分の操作は楽観的更新済みのためスキップ
+  // チャンネル名をユーザーIDでユニーク化（固定名だと複数ユーザーで購読が上書きされる問題を防ぐ）
   likeCountChannel = supabaseClient
-    .channel("likes-watch")
+    .channel(`likes-watch-${currentUserId}`)
     .on("postgres_changes",
       { event: "INSERT", schema: "public", table: "likes" },
       async (payload) => {
@@ -659,8 +660,8 @@ async function enterRevealMode() {
     )
     .subscribe();
 
-  // 30秒ポーリング（Realtimeのフォールバック・DELETE未検知の補完）
-  likeCountPollTimer = setInterval(refreshAllLikeCounts, 30000);
+  // 10秒ポーリング（Realtimeが届かない環境へのフォールバック）
+  likeCountPollTimer = setInterval(refreshAllLikeCounts, 10000);
 }
 
 // 起動時にフラグ確認
