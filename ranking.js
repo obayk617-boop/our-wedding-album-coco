@@ -15,15 +15,17 @@ function getCookie(name) {
 }
 
 function getMySeat() {
-  // 優先順位: URLクエリ → Cookie → localStorage → ゲスト(100)
+  // ① URLクエリ: QRコード初回アクセス & PWA start_url 経由（iOS/Android 共通）
   const params = new URLSearchParams(window.location.search);
   const seatParam = params.get("seat");
   if (seatParam) return seatParam;
 
+  // ② Cookie: タスクキル後の復帰・ブックマークアクセスなど
   const cookieSeat = getCookie("wedding_seat_number");
   if (cookieSeat && cookieSeat !== "100") return cookieSeat;
 
-  return localStorage.getItem("wedding_seat_number") || "100";
+  // ③ ゲスト
+  return "100";
 }
 
 const mySeat = getMySeat();

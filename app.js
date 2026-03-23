@@ -9,11 +9,9 @@ const supabaseClient = createClient(
 席番号管理
 ========================== */
 
-// ──────────────────────────────────────────
+// ─────────────────────────────────────────────────────
 // Cookie ユーティリティ
-// iOSではSafariとPWA(ホーム画面追加)でlocalStorageが
-// 別領域になるが、Cookieはドメイン単位で共有される。
-// ──────────────────────────────────────────
+// ─────────────────────────────────────────────────────
 function setCookie(name, value, days = 365) {
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
   document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
@@ -25,61 +23,34 @@ function getCookie(name) {
 }
 
 function getSeatNumber() {
-  // 優先順位: URLクエリ → Cookie → localStorage → ゲスト(100)
-
-  // ① クエリパラメータ（QRコードからの初回アクセス）
+  // ① URLクエリ: QRコード初回アクセス & PWA start_url 経由（iOS/Android 共通）
   const params = new URLSearchParams(window.location.search);
   const seatParam = params.get("seat");
   if (seatParam) {
-    // Cookie と localStorage 両方に保存
-    setCookie("wedding_seat_number", seatParam);
-    localStorage.setItem("wedding_seat_number", seatParam);
+    setCookie("wedding_seat_number", seatParam); // 次回以降のフォールバック用
     return seatParam;
   }
 
-  // ② Cookie（iOSホーム画面PWAでもSafariと同じCookieが使える）
+  // ② Cookie: タスクキル後の復帰・ブックマークアクセスなど
   const cookieSeat = getCookie("wedding_seat_number");
   if (cookieSeat && cookieSeat !== "100") return cookieSeat;
 
-  // ③ localStorage（通常ブラウザ遷移のフォールバック）
-  const saved = localStorage.getItem("wedding_seat_number");
-  if (saved && saved !== "100") return saved;
-
-  // ④ ゲスト扱い
+  // ③ ゲスト
   return "100";
 }
 
 /* ==========================
-manifest.jsonのstart_urlを席番号入りに動的差し替え
-iOSのPWAはSafariとlocalStorageを共有しないため、
-start_urlにseatクエリを埋め込むことで解決する
+manifest の link タグを Edge Function に向ける
+/api/manifest?seat=N がstart_url入りのJSONを返すため
+iOS/Android PWA どちらでも起動時に ?seat=N が付く
 ========================== */
 function updateManifestStartUrl(seat) {
-  if (seat === "100") return; // ゲストはそのまま
-
-  const baseUrl = location.origin + location.pathname;
-  // start_urlにクエリを含めることでPWA起動時も席番号が引き継がれる
-  const startUrl = `${baseUrl}?seat=${seat}`;
-
-  const manifest = {
-    name: "Wedding Album",
-    short_name: "Wedding",
-    description: "結婚式の思い出をみんなでシェア",
-    start_url: startUrl,
-    display: "standalone",
-    orientation: "portrait",
-    background_color: "#b3ecf8",
-    theme_color: "#29b6d8",
-    lang: "ja",
-    icons: [
-      { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-      { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
-    ]
-  };
-
-  const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
   const existing = document.querySelector('link[rel="manifest"]');
-  if (existing) existing.href = URL.createObjectURL(blob);
+  if (!existing) return;
+  // ゲストは静的 manifest.json のまま、席番号があれば Edge Function へ
+  if (seat !== "100") {
+    existing.href = `/api/manifest?seat=${seat}`;
+  }
 }
 
 const currentSeatNumber = getSeatNumber();
