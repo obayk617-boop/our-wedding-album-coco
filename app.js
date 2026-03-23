@@ -9,36 +9,43 @@ const supabaseClient = createClient(
 席番号管理
 ========================== */
 
-function getSeatNumber() {
-  // 優先順位: URLクエリ → URLハッシュ → localStorage → ゲスト(100)
-  // ハッシュ (#seat=1) はiOS PWAでも起動時に保持されるためフォールバックとして有効
+// ──────────────────────────────────────────
+// Cookie ユーティリティ
+// iOSではSafariとPWA(ホーム画面追加)でlocalStorageが
+// 別領域になるが、Cookieはドメイン単位で共有される。
+// ──────────────────────────────────────────
+function setCookie(name, value, days = 365) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
 
-  // ① クエリパラメータ（通常のSafariアクセス）
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function getSeatNumber() {
+  // 優先順位: URLクエリ → Cookie → localStorage → ゲスト(100)
+
+  // ① クエリパラメータ（QRコードからの初回アクセス）
   const params = new URLSearchParams(window.location.search);
   const seatParam = params.get("seat");
   if (seatParam) {
+    // Cookie と localStorage 両方に保存
+    setCookie("wedding_seat_number", seatParam);
     localStorage.setItem("wedding_seat_number", seatParam);
-    // ハッシュにも書き込んでおく（ホーム画面追加時のstart_url用）
-    if (window.location.hash !== `#seat=${seatParam}`) {
-      history.replaceState(null, "", `?seat=${seatParam}#seat=${seatParam}`);
-    }
     return seatParam;
   }
 
-  // ② URLハッシュ（iOS PWAでstart_urlにハッシュが含まれていた場合）
-  const hashParams = new URLSearchParams(window.location.hash.replace("#", ""));
-  const hashSeat = hashParams.get("seat");
-  if (hashSeat) {
-    localStorage.setItem("wedding_seat_number", hashSeat);
-    return hashSeat;
-  }
+  // ② Cookie（iOSホーム画面PWAでもSafariと同じCookieが使える）
+  const cookieSeat = getCookie("wedding_seat_number");
+  if (cookieSeat && cookieSeat !== "100") return cookieSeat;
 
-  // ③ localStorage（同一オリジン内での通常ブラウザ遷移）
+  // ③ localStorage（通常ブラウザ遷移のフォールバック）
   const saved = localStorage.getItem("wedding_seat_number");
-  if (saved) return saved;
+  if (saved && saved !== "100") return saved;
 
   // ④ ゲスト扱い
-  localStorage.setItem("wedding_seat_number", "100");
   return "100";
 }
 
@@ -51,8 +58,8 @@ function updateManifestStartUrl(seat) {
   if (seat === "100") return; // ゲストはそのまま
 
   const baseUrl = location.origin + location.pathname;
-  // ハッシュをstart_urlに含めることでiOS PWAでも席番号が保持される
-  const startUrl = `${baseUrl}?seat=${seat}#seat=${seat}`;
+  // start_urlにクエリを含めることでPWA起動時も席番号が引き継がれる
+  const startUrl = `${baseUrl}?seat=${seat}`;
 
   const manifest = {
     name: "Wedding Album",

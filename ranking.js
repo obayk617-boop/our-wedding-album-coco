@@ -9,15 +9,19 @@ const supabaseClient = createClient(
 席番号を取得（自分が1位かどうかの判定用）
 ========================== */
 
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 function getMySeat() {
-  // 優先順位: URLクエリ → URLハッシュ → localStorage → ゲスト(100)
+  // 優先順位: URLクエリ → Cookie → localStorage → ゲスト(100)
   const params = new URLSearchParams(window.location.search);
   const seatParam = params.get("seat");
   if (seatParam) return seatParam;
 
-  const hashParams = new URLSearchParams(window.location.hash.replace("#", ""));
-  const hashSeat = hashParams.get("seat");
-  if (hashSeat) return hashSeat;
+  const cookieSeat = getCookie("wedding_seat_number");
+  if (cookieSeat && cookieSeat !== "100") return cookieSeat;
 
   return localStorage.getItem("wedding_seat_number") || "100";
 }
