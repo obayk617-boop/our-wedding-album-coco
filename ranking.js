@@ -10,8 +10,16 @@ const supabaseClient = createClient(
 ========================== */
 
 function getMySeat() {
+  // 優先順位: URLクエリ → URLハッシュ → localStorage → ゲスト(100)
   const params = new URLSearchParams(window.location.search);
-  return params.get("seat") || localStorage.getItem("wedding_seat_number") || "100";
+  const seatParam = params.get("seat");
+  if (seatParam) return seatParam;
+
+  const hashParams = new URLSearchParams(window.location.hash.replace("#", ""));
+  const hashSeat = hashParams.get("seat");
+  if (hashSeat) return hashSeat;
+
+  return localStorage.getItem("wedding_seat_number") || "100";
 }
 
 const mySeat = getMySeat();
