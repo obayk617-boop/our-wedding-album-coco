@@ -323,15 +323,20 @@ downloadBtn.onclick = async (e) => {
 async function compressImage(file, maxWidth = 1280, quality = 0.7) {
   const img = new Image();
   const reader = new FileReader();
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
+    reader.onerror = () => reject(new Error("ファイルの読み込みに失敗しました"));
     reader.onload = e => (img.src = e.target.result);
+    img.onerror = () => reject(new Error("画像のデコードに失敗しました"));
     img.onload = () => {
       const scale = Math.min(maxWidth / img.width, 1);
       const canvas = document.createElement("canvas");
       canvas.width  = img.width  * scale;
       canvas.height = img.height * scale;
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => resolve(blob), "image/jpeg", quality);
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error("画像の変換に失敗しました"));
+      }, "image/jpeg", quality);
     };
     reader.readAsDataURL(file);
   });
@@ -387,6 +392,7 @@ function createImageCard(file) {
   const { data: urlData } = supabaseClient.storage.from("photos").getPublicUrl(file.name);
 
   const container = document.createElement("div");
+  container.className = "gallery-card";
   container.style.cssText = "position: relative; width: 100%; aspect-ratio: 1;";
 
   const img = document.createElement("img");
@@ -463,7 +469,7 @@ const observer = new IntersectionObserver((entries) => {
 }, { root: null, rootMargin: "200px", threshold: 0 });
 
 function updateObserver() {
-  const containers = gallery.querySelectorAll("div");
+  const containers = gallery.querySelectorAll(".gallery-card");
   if (containers.length > 0) observer.observe(containers[containers.length - 1]);
 }
 
@@ -507,17 +513,50 @@ document.addEventListener("visibilitychange", () => {
     stopPhotosPolling();
     if (photosChannel) supabaseClient.removeChannel(photosChannel);
     photosChannel = null;
+    // ②③ 発表後のいいね数更新もバックグラウンドでは止める
+    if (likeCountPollTimer) { clearInterval(likeCountPollTimer); likeCountPollTimer = null; }
+    if (likeCountChannel) { supabaseClient.removeChannel(likeCountChannel); likeCountChannel = null; }
   } else {
-    // 復帰時：即座に新着確認してから再接続
+    // ④ 復帰時：まず即時で新着確認（loadAllImagesはdebounce済み）してRealtimeとポーリングを再開
+    //    startPhotosPollingは内部でguardしているので二重起動しない
     loadAllImages();
     setupRealtimeListeners();
     startPhotosPolling();
+    // 発表済みなら再度enterRevealMode（チャンネルとポーリングが止まっているため再開）
+    if (isRevealMode) {
+      refreshAllLikeCounts();
+      likeCountChannel = supabaseClient
+        .channel(`likes-watch-${currentUserId}-${Date.now()}`)
+        .on("postgres_changes",
+          { event: "INSERT", schema: "public", table: "likes" },
+          async (payload) => {
+            const fileName = payload.new?.file_name;
+            const userId   = payload.new?.user_id;
+            if (!fileName || userId === currentUserId) return;
+            await fetchLikeCount(fileName);
+          }
+        )
+        .on("postgres_changes",
+          { event: "DELETE", schema: "public", table: "likes" },
+          async (payload) => {
+            const fileName = payload.old?.file_name;
+            const userId   = payload.old?.user_id;
+            if (!fileName || userId === currentUserId) return;
+            await fetchLikeCount(fileName);
+          }
+        )
+        .subscribe();
+      likeCountPollTimer = setInterval(refreshAllLikeCounts, 10000);
+    }
   }
 });
 
 window.addEventListener("beforeunload", () => {
   stopPhotosPolling();
   if (photosChannel) supabaseClient.removeChannel(photosChannel);
+  // ②③ いいね数チャンネルとポーリングも確実に停止
+  if (likeCountPollTimer) { clearInterval(likeCountPollTimer); likeCountPollTimer = null; }
+  if (likeCountChannel) supabaseClient.removeChannel(likeCountChannel);
 });
 
 /* ==========================
@@ -598,7 +637,19 @@ confirmUpload.onclick = async () => {
   uploadStatus.textContent = "圧縮中…";
   spinner.classList.remove("hidden");
 
-  const compressedBlob = await compressImage(selectedFile);
+  let compressedBlob;
+  try {
+    compressedBlob = await compressImage(selectedFile);
+  } catch (err) {
+    console.error("圧縮エラー:", err);
+    uploadStatus.textContent = "";
+    spinner.classList.add("hidden");
+    showToast("画像を読み込めませんでした。別の写真をお試しください");
+    isUploading = false;
+    confirmUpload.disabled = false;
+    cancelUpload.disabled = false;
+    return;
+  }
   uploadStatus.textContent = "アップロード中…";
 
   // ファイル名にseat番号を埋め込む（ランキング集計用）
