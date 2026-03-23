@@ -22,7 +22,40 @@ function getSeatNumber() {
   return "100";
 }
 
+/* ==========================
+manifest.jsonのstart_urlを席番号入りに動的差し替え
+iOSのPWAはSafariとlocalStorageを共有しないため、
+start_urlにseatクエリを埋め込むことで解決する
+========================== */
+function updateManifestStartUrl(seat) {
+  if (seat === "100") return; // ゲストはそのまま
+
+  const baseUrl = location.origin + location.pathname;
+  const startUrl = `${baseUrl}?seat=${seat}`;
+
+  const manifest = {
+    name: "Wedding Album",
+    short_name: "Wedding",
+    description: "結婚式の思い出をみんなでシェア",
+    start_url: startUrl,
+    display: "standalone",
+    orientation: "portrait",
+    background_color: "#b3ecf8",
+    theme_color: "#29b6d8",
+    lang: "ja",
+    icons: [
+      { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+      { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+    ]
+  };
+
+  const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+  const existing = document.querySelector('link[rel="manifest"]');
+  if (existing) existing.href = URL.createObjectURL(blob);
+}
+
 const currentSeatNumber = getSeatNumber();
+updateManifestStartUrl(currentSeatNumber);
 const isGuest = currentSeatNumber === "100";
 
 function getOrCreateUserId() {
