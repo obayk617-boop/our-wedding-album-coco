@@ -55,6 +55,88 @@
   <!-- ＋ボタン -->
   <div id="fab" class="fab">＋</div>
 
+  <!-- ？ヘルプボタン -->
+  <div id="helpBtn" class="help-btn">?</div>
+
+  <!-- ホーム画面追加ガイドモーダル -->
+  <div id="helpModal" class="modal hidden">
+    <div class="modal-content help-modal-content">
+      <h2>ホーム画面に追加</h2>
+      <p class="help-lead">アプリのように使えます</p>
+
+      <!-- タブ切り替え -->
+      <div class="help-tabs">
+        <button class="help-tab active" data-tab="ios"> iPhone</button>
+        <button class="help-tab" data-tab="android"> Android</button>
+      </div>
+
+      <!-- iOS パネル -->
+      <div id="helpTabIos" class="help-panel">
+        <p class="help-note">※ <strong>Safari</strong> で開いてください。ChromeではPWA追加できません。</p>
+
+        <!-- iOS 26 -->
+        <details class="help-section" open>
+          <summary>iOS 26 以降</summary>
+          <ol class="help-steps">
+            <li>画面右下の <strong>「…」</strong> をタップ</li>
+            <li>メニューから <strong>「共有」</strong> を選択</li>
+            <li>一覧を下にスクロールして <strong>「ホーム画面に追加」</strong> をタップ</li>
+            <li><strong>「Webアプリとして開く」</strong> をオンにする</li>
+            <li>右上の <strong>「追加」</strong> をタップして完了</li>
+          </ol>
+          <p class="help-tip">iOS 26 では Safari のデザインが大きく変わりました。「…」が見当たらない場合はアドレスバーを長押しすると「共有」が出ます。</p>
+        </details>
+
+        <!-- iOS 16〜25 -->
+        <details class="help-section">
+          <summary>iOS 16 〜 25</summary>
+          <ol class="help-steps">
+            <li>画面下部中央の <strong>共有ボタン（□↑）</strong> をタップ</li>
+            <li>一覧を下にスクロールして <strong>「ホーム画面に追加」</strong> をタップ</li>
+            <li>名前を確認して <strong>「追加」</strong> をタップして完了</li>
+          </ol>
+          <p class="help-tip">iOS 16.4 以降はPWA対応でアプリのように起動します。</p>
+        </details>
+
+        <!-- iOS 14〜15 -->
+        <details class="help-section">
+          <summary>iOS 14 〜 15</summary>
+          <ol class="help-steps">
+            <li>画面下部中央の <strong>共有ボタン（□↑）</strong> をタップ</li>
+            <li>一覧を下にスクロールして <strong>「ホーム画面に追加」</strong> をタップ</li>
+            <li>名前を確認して <strong>「追加」</strong> をタップして完了</li>
+          </ol>
+        </details>
+      </div>
+
+      <!-- Android パネル -->
+      <div id="helpTabAndroid" class="help-panel hidden">
+        <p class="help-note">※ <strong>Chrome</strong> で開いてください。</p>
+
+        <details class="help-section" open>
+          <summary>Chrome（標準）</summary>
+          <ol class="help-steps">
+            <li>画面右上の <strong>「⋮」（メニュー）</strong> をタップ</li>
+            <li><strong>「ホーム画面に追加」</strong> または <strong>「アプリをインストール」</strong> をタップ</li>
+            <li>確認ダイアログで <strong>「追加」または「インストール」</strong> をタップして完了</li>
+          </ol>
+          <p class="help-tip">インストールバナーが画面下に自動表示されることもあります。その場合はバナーをタップするだけでOK。</p>
+        </details>
+
+        <details class="help-section">
+          <summary>Samsung Internet</summary>
+          <ol class="help-steps">
+            <li>画面下部の <strong>「☰」（メニュー）</strong> をタップ</li>
+            <li><strong>「ページを追加」→「ホーム画面」</strong> をタップ</li>
+            <li><strong>「追加」</strong> をタップして完了</li>
+          </ol>
+        </details>
+      </div>
+
+      <button id="closeHelp" class="btn btn-secondary" style="margin-top:16px;width:100%;">閉じる</button>
+    </div>
+  </div>
+
 
   <!-- アップロード確認モーダル -->
   <div id="previewModal" class="modal hidden">

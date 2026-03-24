@@ -569,6 +569,40 @@ fab.onclick = (e) => {
 };
 
 /* ==========================
+ヘルプモーダル（ホーム画面追加ガイド）
+========================== */
+
+const helpBtn    = document.getElementById("helpBtn");
+const helpModal  = document.getElementById("helpModal");
+const closeHelp  = document.getElementById("closeHelp");
+const helpTabs   = document.querySelectorAll(".help-tab");
+const helpPanels = { ios: document.getElementById("helpTabIos"), android: document.getElementById("helpTabAndroid") };
+
+helpBtn.onclick = (e) => {
+  e.stopPropagation();
+  helpModal.classList.remove("hidden");
+};
+
+closeHelp.onclick = () => helpModal.classList.add("hidden");
+
+// 背景タップで閉じる
+helpModal.onclick = (e) => {
+  if (e.target === helpModal) helpModal.classList.add("hidden");
+};
+
+// タブ切り替え
+helpTabs.forEach(tab => {
+  tab.onclick = () => {
+    helpTabs.forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const target = tab.dataset.tab;
+    Object.entries(helpPanels).forEach(([key, panel]) => {
+      panel.classList.toggle("hidden", key !== target);
+    });
+  };
+});
+
+/* ==========================
 隠しボタン：席番号バッジを5回タップでranking.htmlへ
 ========================== */
 

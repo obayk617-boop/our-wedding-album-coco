@@ -392,6 +392,169 @@ button {
 }
 
 /* =====================
+？ヘルプボタン
+===================== */
+
+.help-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 90px; /* fabの左に並べる */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.help-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* =====================
+ヘルプモーダル
+===================== */
+
+.help-modal-content {
+  max-height: 85vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 360px !important;
+}
+
+.help-lead {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.7;
+  margin: -8px 0 14px;
+  letter-spacing: 0.3px;
+}
+
+/* タブ */
+.help-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.help-tab {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.help-tab.active {
+  background: rgba(41, 182, 216, 0.28);
+  border-color: rgba(41, 182, 216, 0.6);
+  color: white;
+}
+
+.help-tab:active {
+  transform: scale(0.97);
+}
+
+/* 注記 */
+.help-note {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.07);
+  border-left: 2px solid rgba(41, 182, 216, 0.6);
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin: 0 0 10px 0;
+  line-height: 1.6;
+}
+
+/* セクション（折りたたみ） */
+.help-section {
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.help-section summary {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.06);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.help-section summary::-webkit-details-marker { display: none; }
+
+.help-section summary::after {
+  content: '›';
+  font-size: 16px;
+  opacity: 0.5;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.help-section[open] summary::after {
+  transform: rotate(270deg);
+}
+
+/* ステップリスト */
+.help-steps {
+  margin: 0;
+  padding: 10px 14px 10px 32px;
+  list-style: decimal;
+}
+
+.help-steps li {
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.82);
+  margin-bottom: 2px;
+}
+
+.help-steps li strong {
+  color: white;
+}
+
+/* ヒント */
+.help-tip {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 6px 14px 10px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* =====================
 タッチ最適化
 ===================== */
 
